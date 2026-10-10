@@ -54,8 +54,20 @@ export default function Dashboard({ onSelectClient }) {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-200">
-      <header className="bg-slate-900 border-b border-slate-800 px-6 py-4 flex justify-between items-center sticky top-0 z-10">
+    <div className="min-h-screen text-slate-200 relative">
+      {/* Fondo corporativo visible */}
+      <div className="fixed inset-0 z-0 pointer-events-none">
+        <div className="absolute inset-0 bg-slate-950/70 z-10" />
+        <div className="absolute inset-0 bg-slate-900/40 mix-blend-multiply z-10" />
+        <img 
+          src="https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=2070&auto=format&fit=crop" 
+          alt="Dashboard background" 
+          className="absolute inset-0 w-full h-full object-cover opacity-100"
+        />
+      </div>
+
+      <div className="relative z-10">
+        <header className="bg-slate-950/80 backdrop-blur-md border-b border-slate-800 px-6 py-4 flex justify-between items-center sticky top-0 z-20">
         <h1 className="text-xl font-bold text-white flex items-center gap-2">
           <User className="w-6 h-6 text-primary-500" />
           Panel de Gestoría
@@ -73,15 +85,33 @@ export default function Dashboard({ onSelectClient }) {
       </header>
 
       <main className="max-w-6xl mx-auto p-6">
-        <div className="flex justify-between items-center mb-8">
-          <h2 className="text-2xl font-bold text-white">Mis Clientes</h2>
-          <button 
-            onClick={() => setShowAddModal(true)}
-            className="bg-primary-600 hover:bg-primary-500 text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors"
-          >
-            <Plus className="w-5 h-5" />
-            Nuevo Cliente
-          </button>
+        
+        {/* Banner Hero Profesional */}
+        <div className="relative overflow-hidden rounded-3xl bg-slate-900 border border-slate-800 shadow-2xl mb-8 flex flex-col md:flex-row items-center justify-between">
+          <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-primary-500/10 rounded-full blur-3xl -mr-40 -mt-40 pointer-events-none"></div>
+          <div className="absolute bottom-0 left-0 w-[300px] h-[300px] bg-blue-500/10 rounded-full blur-3xl -ml-20 -mb-20 pointer-events-none"></div>
+          
+          <div className="relative z-10 p-8 md:p-10 flex-1">
+            <h2 className="text-3xl font-bold text-white mb-3">Panel de Asesoramiento</h2>
+            <p className="text-slate-400 max-w-xl text-lg leading-relaxed">
+              Gestione de forma integral los expedientes de jubilación de sus clientes. 
+              Cree proyecciones personalizadas, optimice su fiscalidad y simule eventos de liquidez.
+            </p>
+          </div>
+          
+          <div className="relative z-10 p-8 md:p-10 shrink-0 flex flex-col sm:flex-row gap-4 border-t md:border-t-0 md:border-l border-slate-800/50 w-full md:w-auto bg-slate-900/50 backdrop-blur-sm">
+            <div className="bg-slate-950/50 border border-slate-800 rounded-2xl p-5 text-center min-w-[140px] shadow-inner">
+              <p className="text-4xl font-black text-primary-400 mb-1">{clientes.length}</p>
+              <p className="text-xs text-slate-500 uppercase tracking-widest font-semibold">Expedientes</p>
+            </div>
+            <button 
+              onClick={() => setShowAddModal(true)}
+              className="bg-primary-600 hover:bg-primary-500 text-white px-6 py-4 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg hover:shadow-primary-500/30 w-full sm:w-auto"
+            >
+              <Plus className="w-5 h-5" />
+              Nuevo Cliente
+            </button>
+          </div>
         </div>
 
         {loading ? (
@@ -108,11 +138,16 @@ export default function Dashboard({ onSelectClient }) {
                 onClick={() => onSelectClient(cliente)}
               >
                 <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <h3 className="text-lg font-bold text-white group-hover:text-primary-400 transition-colors">{cliente.name}</h3>
-                    <p className="text-sm text-slate-400">Edad: {cliente.age} años</p>
+                  <div className="flex gap-4 items-center">
+                    <div className="w-12 h-12 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center shrink-0 overflow-hidden">
+                      <User className="w-6 h-6 text-slate-400 group-hover:text-primary-400 transition-colors" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold text-white group-hover:text-primary-400 transition-colors tracking-tight">{cliente.name}</h3>
+                      <p className="text-sm text-slate-400 font-medium">{cliente.age} años de edad</p>
+                    </div>
                   </div>
-                  <div className="p-2 bg-slate-800 rounded-lg group-hover:bg-primary-900/30">
+                  <div className="p-2.5 bg-slate-800 rounded-xl group-hover:bg-primary-900/40 group-hover:scale-110 transition-all">
                     <ArrowRight className="w-5 h-5 text-slate-400 group-hover:text-primary-400" />
                   </div>
                 </div>
@@ -179,6 +214,7 @@ export default function Dashboard({ onSelectClient }) {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

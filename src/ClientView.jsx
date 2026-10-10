@@ -45,8 +45,20 @@ export default function ClientView({ cliente, onBack }) {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-200">
-      <header className="bg-slate-900 border-b border-slate-800 px-6 py-4 flex items-center gap-4 sticky top-0 z-10">
+    <div className="min-h-screen text-slate-200 relative">
+      {/* Fondo corporativo visible */}
+      <div className="fixed inset-0 z-0 pointer-events-none">
+        <div className="absolute inset-0 bg-slate-950/70 z-10" />
+        <div className="absolute inset-0 bg-slate-900/40 mix-blend-multiply z-10" />
+        <img 
+          src="https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=2070&auto=format&fit=crop" 
+          alt="Client background" 
+          className="absolute inset-0 w-full h-full object-cover opacity-100"
+        />
+      </div>
+
+      <div className="relative z-10">
+        <header className="bg-slate-950/80 backdrop-blur-md border-b border-slate-800 px-6 py-4 flex items-center gap-4 sticky top-0 z-20">
         <button 
           onClick={onBack}
           className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
@@ -134,6 +146,7 @@ export default function ClientView({ cliente, onBack }) {
           </div>
         )}
       </main>
+      </div>
     </div>
   );
 }
