@@ -236,6 +236,7 @@ export default function Simulator({ client, scenario, onBack }) {
     const excelData = chartData.map(row => ({
       'Año': row.year,
       'Edad': row.age,
+      'Ingreso Neto Real (Mes)': roundToTwo(row.realMonthlyIncome),
       'Ingresos Alquiler': roundToTwo(row.rentIncome),
       'Faltante a Cubrir': roundToTwo(row.gap),
       'Rescate Plan Pensiones': roundToTwo(row.withdrawnFromPension),
@@ -265,6 +266,7 @@ export default function Simulator({ client, scenario, onBack }) {
     const colWidths = [
       { wch: 8 },  // Año
       { wch: 8 },  // Edad
+      { wch: 24 }, // Ingreso Neto Real (Mes)
       { wch: 20 }, // Ingresos Alquiler
       { wch: 20 }, // Faltante a Cubrir
       { wch: 25 }, // Rescate Plan Pensiones
@@ -684,6 +686,63 @@ export default function Simulator({ client, scenario, onBack }) {
                 </ResponsiveContainer>
               </div>
             </div>
+
+            {/* SEGUNDO GRÁFICO: Flujo de Caja y Nivel de Vida Mensual */}
+            <div className="bg-slate-900 p-6 rounded-2xl shadow-xl border border-slate-800 h-[430px] flex flex-col">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-6">
+                <div>
+                  <h2 className="text-lg font-semibold text-white">Evolución de tu Nivel de Vida Mensual</h2>
+                  <p className="text-xs text-slate-400 mt-0.5">Ingreso neto deseado vs. flujo de caja neto real disponible</p>
+                </div>
+              </div>
+              <div className="flex-1 min-h-0">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={chartData} margin={{ top: 20, right: 10, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" />
+                    <XAxis 
+                      dataKey="year" 
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: '#94a3b8' }}
+                      dy={10}
+                    />
+                    <YAxis 
+                      tickFormatter={(value) => `${value >= 1000 ? (value / 1000).toFixed(1) + 'k' : value}€`} 
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: '#94a3b8' }}
+                      dx={-10}
+                    />
+                    <Tooltip 
+                      formatter={(value, name) => [
+                        formatCurrency(value), 
+                        name === 'desiredMonthlyIncome' ? 'Ingreso Deseado (Mes)' : 'Ingreso Real Disponible (Mes)'
+                      ]}
+                      labelFormatter={(label) => `Año ${label}`}
+                      contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '12px', color: '#fff' }}
+                    />
+                    <Legend verticalAlign="top" height={36} wrapperStyle={{ paddingBottom: '10px' }} />
+                    <Line 
+                      type="monotone" 
+                      dataKey="desiredMonthlyIncome" 
+                      name="Ingreso Deseado (Mes)" 
+                      stroke="#f87171" 
+                      strokeWidth={2} 
+                      strokeDasharray="5 5" 
+                      dot={false} 
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="realMonthlyIncome" 
+                      name="Ingreso Real Disponible (Mes)" 
+                      stroke="#10b981" 
+                      strokeWidth={3.5} 
+                      dot={false} 
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
           </div>
         </div>
         )}
@@ -878,6 +937,7 @@ export default function Simulator({ client, scenario, onBack }) {
               <thead className="bg-slate-950/90 backdrop-blur-sm text-slate-400 font-semibold uppercase text-xs tracking-wider sticky top-[175px] md:top-[195px] z-20 shadow-md">
                 <tr>
                   <th className="px-6 py-4">Año (Edad)</th>
+                  <th className="px-6 py-4 text-right text-emerald-400">Ingreso Neto Real (Mes)</th>
                   <th className="px-6 py-4 text-right">Ingresos Alquiler</th>
                   <th className="px-6 py-4 text-right">Faltante a cubrir</th>
                   <th className="px-6 py-4 text-right text-emerald-400">Rescate Plan Pensiones</th>
@@ -891,6 +951,9 @@ export default function Simulator({ client, scenario, onBack }) {
                   <tr key={row.year} className="hover:bg-slate-800/50 transition-colors">
                     <td className="px-6 py-3 font-medium text-white">
                       {row.year} <span className="text-slate-500 font-normal">({row.age}a)</span>
+                    </td>
+                    <td className={`px-6 py-3 text-right font-bold ${row.uncoveredDeficit > 0.01 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                      {formatCurrency(row.realMonthlyIncome)}
                     </td>
                     <td className="px-6 py-3 text-right text-purple-400 font-medium">
                       {row.rentIncome > 0 ? formatCurrency(row.rentIncome) : <span className="text-slate-600">-</span>}

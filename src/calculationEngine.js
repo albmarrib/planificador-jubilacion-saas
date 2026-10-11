@@ -176,6 +176,12 @@ export function projectRetirement(params) {
     const totalBaseGeneralBrutaFinal = baseGeneralPreRescate + withdrawnFromPension;
     const taxGeneral = calculateTaxes(totalBaseGeneralBrutaFinal, generalTaxBrackets);
 
+    // Flujo de caja neto real anual y mensual
+    const rescateNetoAnual = gap > 0 ? Math.max(0, gap - remainingGap) : 0;
+    const ingresoNetoRealAnual = totalNetoDisponiblePreRescate + rescateNetoAnual;
+    const realMonthlyIncome = ingresoNetoRealAnual / 12;
+    const desiredMonthlyIncome = currentDesiredIncome / 12;
+
     // 2. Calcular beneficio global para aplicar correctamente la progresividad fiscal en Base del Ahorro
     let totalProfitSavingsBase = 0;
     for (const acc of currentSavings) {
@@ -235,6 +241,9 @@ export function projectRetirement(params) {
       impuestosDeLaPension,
       rentIncome: totalRentIncome,
       desiredIncome: currentDesiredIncome,
+      desiredMonthlyIncome,
+      realMonthlyIncome,
+      rescateNetoAnual,
       gap,
       totalCapital: totalSavingsYearEnd,
       capitalLiquido,
