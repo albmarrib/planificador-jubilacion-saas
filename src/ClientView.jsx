@@ -8,6 +8,7 @@ export default function ClientView({ cliente, onBack }) {
   const [escenarios, setEscenarios] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeScenario, setActiveScenario] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   
   useEffect(() => {
     loadEscenarios();
@@ -29,6 +30,32 @@ export default function ClientView({ cliente, onBack }) {
       console.error("Error loading scenarios:", err);
     }
     setLoading(false);
+  };
+
+  const handleDeleteClient = async () => {
+    const confirmMessage = `¿Estás seguro de que deseas eliminar permanentemente el expediente de "${cliente.name}"? Esta acción no se puede deshacer y borrará todas sus simulaciones.`;
+    if (!window.confirm(confirmMessage)) return;
+
+    setIsDeleting(true);
+    try {
+      // 1. Borrar todas las simulaciones / escenarios
+      const q = query(collection(db, `gestorias/${auth.currentUser.uid}/clientes/${cliente.id}/escenarios`));
+      const querySnapshot = await getDocs(q);
+      const deletePromises = querySnapshot.docs.map(scenarioDoc => 
+        deleteDoc(doc(db, `gestorias/${auth.currentUser.uid}/clientes/${cliente.id}/escenarios`, scenarioDoc.id))
+      );
+      await Promise.all(deletePromises);
+
+      // 2. Borrar el documento del cliente
+      await deleteDoc(doc(db, `gestorias/${auth.currentUser.uid}/clientes`, cliente.id));
+
+      // 3. Volver al dashboard
+      onBack();
+    } catch (err) {
+      console.error("Error al eliminar el expediente:", err);
+      alert("Hubo un error al eliminar el expediente.");
+      setIsDeleting(false);
+    }
   };
 
   const createNewScenario = () => {
@@ -58,20 +85,33 @@ export default function ClientView({ cliente, onBack }) {
       </div>
 
       <div className="relative z-10">
-        <header className="bg-slate-950/80 backdrop-blur-md border-b border-slate-800 px-6 py-4 flex items-center gap-4 sticky top-0 z-20">
-        <button 
-          onClick={onBack}
-          className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
-        >
-          <ArrowLeft className="w-5 h-5" />
-        </button>
-        <div>
-          <h1 className="text-xl font-bold text-white flex items-center gap-2">
-            Expediente: {cliente.name}
-          </h1>
-          <p className="text-sm text-slate-400">Edad: {cliente.age} años {cliente.notes && `• ${cliente.notes}`}</p>
-        </div>
-      </header>
+        <header className="bg-slate-950/80 backdrop-blur-md border-b border-slate-800 px-6 py-4 flex items-center justify-between sticky top-0 z-20">
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={onBack}
+              className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+              title="Volver al panel"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <div>
+              <h1 className="text-xl font-bold text-white flex items-center gap-2">
+                Expediente: {cliente.name}
+              </h1>
+              <p className="text-sm text-slate-400">Edad: {cliente.age} años {cliente.notes && `• ${cliente.notes}`}</p>
+            </div>
+          </div>
+
+          <button
+            onClick={handleDeleteClient}
+            disabled={isDeleting}
+            className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-red-400 hover:text-white bg-red-950/30 hover:bg-red-600 border border-red-800/40 rounded-lg transition-all disabled:opacity-50"
+            title="Eliminar este expediente"
+          >
+            <Trash2 className="w-4 h-4" />
+            <span>{isDeleting ? 'Eliminando...' : 'Eliminar Expediente'}</span>
+          </button>
+        </header>
 
       <main className="max-w-5xl mx-auto p-6">
         <div className="flex justify-between items-center mb-8">
@@ -120,13 +160,13 @@ export default function ClientView({ cliente, onBack }) {
                   <button
                     onClick={async (e) => {
                       e.stopPropagation();
-                      if (window.confirm('¿Seguro que deseas eliminar este escenario?')) {
+                      if (window.confirm('¿Seguro que deseas eliminar esta simulación?')) {
                         await deleteDoc(doc(db, `gestorias/${auth.currentUser.uid}/clientes/${cliente.id}/escenarios`, escenario.id));
                         loadEscenarios();
                       }
                     }}
-                    className="p-2 text-slate-500 hover:text-red-400 hover:bg-red-950/30 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
-                    title="Eliminar escenario"
+                    className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-950/40 rounded-lg transition-colors"
+                    title="Eliminar simulación"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>

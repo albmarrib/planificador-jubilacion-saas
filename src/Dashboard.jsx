@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { collection, query, getDocs, addDoc } from 'firebase/firestore';
+import { collection, query, getDocs, addDoc, doc, deleteDoc } from 'firebase/firestore';
 import { db, auth } from './firebase';
-import { LogOut, Plus, User, FileText, ArrowRight } from 'lucide-react';
+import { LogOut, Plus, User, FileText, ArrowRight, Trash2 } from 'lucide-react';
 import { signOut } from 'firebase/auth';
 
 export default function Dashboard({ onSelectClient }) {
@@ -50,6 +50,30 @@ export default function Dashboard({ onSelectClient }) {
       loadClientes();
     } catch (err) {
       console.error("Error adding client:", err);
+    }
+  };
+
+  const handleDeleteClient = async (e, clientToDelete) => {
+    e.stopPropagation();
+    if (!window.confirm(`¿Seguro que deseas eliminar permanentemente el expediente de "${clientToDelete.name}" y todas sus simulaciones?`)) {
+      return;
+    }
+
+    try {
+      // 1. Borrar todas las simulaciones asociadas al cliente
+      const q = query(collection(db, `gestorias/${auth.currentUser.uid}/clientes/${clientToDelete.id}/escenarios`));
+      const querySnapshot = await getDocs(q);
+      const deletePromises = querySnapshot.docs.map(scenarioDoc => 
+        deleteDoc(doc(db, `gestorias/${auth.currentUser.uid}/clientes/${clientToDelete.id}/escenarios`, scenarioDoc.id))
+      );
+      await Promise.all(deletePromises);
+
+      // 2. Borrar el documento del cliente
+      await deleteDoc(doc(db, `gestorias/${auth.currentUser.uid}/clientes`, clientToDelete.id));
+      loadClientes();
+    } catch (err) {
+      console.error("Error al eliminar cliente:", err);
+      alert("Error al eliminar el cliente.");
     }
   };
 
@@ -147,8 +171,18 @@ export default function Dashboard({ onSelectClient }) {
                       <p className="text-sm text-slate-400 font-medium">{cliente.age} años de edad</p>
                     </div>
                   </div>
-                  <div className="p-2.5 bg-slate-800 rounded-xl group-hover:bg-primary-900/40 group-hover:scale-110 transition-all">
-                    <ArrowRight className="w-5 h-5 text-slate-400 group-hover:text-primary-400" />
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={(e) => handleDeleteClient(e, cliente)}
+                      className="p-2 text-slate-500 hover:text-red-400 hover:bg-red-950/40 rounded-xl transition-all"
+                      title="Eliminar expediente"
+                    >
+                      <Trash2 className="w-5 h-5" />
+                    </button>
+                    <div className="p-2.5 bg-slate-800 rounded-xl group-hover:bg-primary-900/40 group-hover:scale-110 transition-all">
+                      <ArrowRight className="w-5 h-5 text-slate-400 group-hover:text-primary-400" />
+                    </div>
                   </div>
                 </div>
                 {cliente.notes && (
