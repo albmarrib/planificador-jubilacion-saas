@@ -2,14 +2,13 @@ import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
-// TODO: Replace with your actual Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyALw5FnmhK40sy5Y8xfeDS_wWJshyS4BM4",
-  authDomain: "jubilacion-app.firebaseapp.com",
-  projectId: "jubilacion-app",
-  storageBucket: "jubilacion-app.firebasestorage.app",
-  messagingSenderId: "520677822676",
-  appId: "1:520677822676:web:e1bda9285baaa2dc5a6b41"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
 const app = initializeApp(firebaseConfig);
