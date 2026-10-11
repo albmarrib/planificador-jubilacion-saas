@@ -912,85 +912,85 @@ export default function Simulator({ client, scenario, onBack }) {
 
         {/* BOTTOM ROW: Rescue Plan Table */}
         {activeTab === 'plan' && (
-          <div className="bg-slate-900 rounded-2xl shadow-xl border border-slate-800 overflow-hidden">
-            <div className="p-6 py-4 border-b border-slate-800 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-slate-900/90">
-              <div>
-                <h2 className="text-xl font-semibold flex items-center gap-2 text-white">
-                  <Table className="w-5 h-5 text-primary-500" />
-                  Plan de Rescate Optimizado
-                </h2>
-                <p className="text-slate-400 text-sm mt-1">
-                  Desglose anual priorizando retiros de Planes de Pensiones hasta el límite óptimo del tramo de IRPF.
-                </p>
-              </div>
-              <button 
-                onClick={handleExportExcel}
-                className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 hover:border-slate-600 px-4 py-2 rounded-lg font-medium text-sm transition-colors whitespace-nowrap shadow-sm"
-              >
-                <Download className="w-4 h-4" />
-                Exportar Excel
-              </button>
+          <div className="bg-slate-900 rounded-2xl shadow-xl border border-slate-800">
+          <div className="sticky top-[95px] md:top-[115px] z-30 bg-slate-900/95 backdrop-blur-md p-6 py-4 border-b border-slate-800 rounded-t-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+              <h2 className="text-xl font-semibold flex items-center gap-2 text-white">
+                <Table className="w-5 h-5 text-primary-500" />
+                Plan de Rescate Optimizado
+              </h2>
+              <p className="text-slate-400 text-sm mt-1">
+                Desglose anual priorizando retiros de Planes de Pensiones hasta el límite óptimo del tramo de IRPF.
+              </p>
             </div>
-            
-            <div className="w-full overflow-x-auto max-h-[700px] overflow-y-auto">
-              <table className="w-full text-left text-sm whitespace-nowrap border-collapse">
-                <thead className="bg-slate-950/95 backdrop-blur-sm text-slate-400 font-semibold uppercase text-xs tracking-wider sticky top-0 z-20 shadow-sm border-b border-slate-800">
-                  <tr>
-                    <th className="px-5 py-4 text-left min-w-[120px]">Año (Edad)</th>
-                    <th className="px-5 py-4 text-right text-emerald-400 min-w-[175px]">Ingreso Neto Real (Mes)</th>
-                    <th className="px-5 py-4 text-right text-purple-400 min-w-[145px]">Ingresos Alquiler</th>
-                    <th className="px-5 py-4 text-right min-w-[145px]">Faltante a cubrir</th>
-                    <th className="px-5 py-4 text-right text-emerald-400 min-w-[170px]">Rescate Plan Pensiones</th>
-                    <th className="px-5 py-4 text-right text-blue-400 min-w-[145px]">Rescate Fondos</th>
-                    <th className="px-5 py-4 text-right text-red-400 min-w-[155px]">Impuestos Estimados</th>
-                    <th className="px-5 py-4 text-right text-white min-w-[150px]">Capital Restante</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/60 text-slate-300">
-                  {chartData.map((row, index) => (
-                    <tr key={row.year} className="hover:bg-slate-800/50 transition-colors">
-                      <td className="px-5 py-3.5 font-medium text-white">
-                        {row.year} <span className="text-slate-500 font-normal">({row.age}a)</span>
-                      </td>
-                      <td className={`px-5 py-3.5 text-right font-bold tabular-nums font-mono ${row.uncoveredDeficit > 0.01 ? 'text-amber-400 bg-amber-950/20' : 'text-emerald-400 bg-emerald-950/10'}`}>
-                        {formatCurrency(row.realMonthlyIncome)}
-                      </td>
-                      <td className="px-5 py-3.5 text-right text-purple-400 font-medium tabular-nums font-mono">
-                        {row.rentIncome > 0 ? formatCurrency(row.rentIncome) : <span className="text-slate-600 font-normal">-</span>}
-                      </td>
-                      <td className={`px-5 py-3.5 text-right tabular-nums font-mono ${row.uncoveredDeficit > 0.01 ? 'text-red-400 font-bold' : 'text-slate-400'}`}>
-                        {row.gap > 0 ? formatCurrency(row.gap) : <span className="text-slate-600 font-normal">0,00 €</span>}
-                      </td>
-                      <td className="px-5 py-3.5 text-right tabular-nums font-mono">
-                        {row.withdrawnFromPension > 0 ? (
-                          <span className="text-emerald-400 font-medium">{formatCurrency(row.withdrawnFromPension)}</span>
-                        ) : (
-                          <span className="text-slate-600 font-normal">-</span>
-                        )}
-                      </td>
-                      <td className="px-5 py-3.5 text-right tabular-nums font-mono">
-                        {row.withdrawnFromSavings > 0 ? (
-                          <span className="text-blue-400 font-medium">{formatCurrency(row.withdrawnFromSavings)}</span>
-                        ) : (
-                          <span className="text-slate-600 font-normal">-</span>
-                        )}
-                      </td>
-                      <td className="px-5 py-3.5 text-right tabular-nums font-mono">
-                        {row.estimatedTaxes > 0 ? (
-                          <span className="text-red-400">{formatCurrency(row.estimatedTaxes)}</span>
-                        ) : (
-                          <span className="text-slate-600 font-normal">-</span>
-                        )}
-                      </td>
-                      <td className="px-5 py-3.5 text-right font-semibold text-white tabular-nums font-mono">
-                        {row.totalCapital > 0 ? formatCurrency(row.totalCapital) : <span className="text-red-500 font-bold">Agotado</span>}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <button 
+              onClick={handleExportExcel}
+              className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 hover:border-slate-600 px-4 py-2 rounded-lg font-medium text-sm transition-colors whitespace-nowrap"
+            >
+              <Download className="w-4 h-4" />
+              Exportar Excel
+            </button>
           </div>
+          
+          <div className="max-w-full">
+            <table className="w-full text-left text-sm whitespace-nowrap">
+              <thead className="bg-slate-950/90 backdrop-blur-sm text-slate-400 font-semibold uppercase text-xs tracking-wider sticky top-[175px] md:top-[195px] z-20 shadow-md">
+                <tr>
+                  <th className="px-6 py-4">Año (Edad)</th>
+                  <th className="px-6 py-4 text-right text-emerald-400">Ingreso Neto Real (Mes)</th>
+                  <th className="px-6 py-4 text-right">Ingresos Alquiler</th>
+                  <th className="px-6 py-4 text-right">Faltante a cubrir</th>
+                  <th className="px-6 py-4 text-right text-emerald-400">Rescate Plan Pensiones</th>
+                  <th className="px-6 py-4 text-right text-blue-400">Rescate Fondos</th>
+                  <th className="px-6 py-4 text-right text-red-400">Impuestos Estimados</th>
+                  <th className="px-6 py-4 text-right">Capital Restante</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/50 text-slate-300">
+                {chartData.map((row, index) => (
+                  <tr key={row.year} className="hover:bg-slate-800/50 transition-colors">
+                    <td className="px-6 py-3 font-medium text-white">
+                      {row.year} <span className="text-slate-500 font-normal">({row.age}a)</span>
+                    </td>
+                    <td className={`px-6 py-3 text-right font-bold ${row.uncoveredDeficit > 0.01 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                      {formatCurrency(row.realMonthlyIncome)}
+                    </td>
+                    <td className="px-6 py-3 text-right text-purple-400 font-medium">
+                      {row.rentIncome > 0 ? formatCurrency(row.rentIncome) : <span className="text-slate-600">-</span>}
+                    </td>
+                    <td className={`px-6 py-3 text-right ${row.uncoveredDeficit > 0.01 ? 'text-red-500 font-bold' : 'text-slate-400'}`}>
+                      {formatCurrency(row.gap)}
+                    </td>
+                    <td className="px-6 py-3 text-right">
+                      {row.withdrawnFromPension > 0 ? (
+                        <span className="text-emerald-400 font-medium">{formatCurrency(row.withdrawnFromPension)}</span>
+                      ) : (
+                        <span className="text-slate-600">-</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-3 text-right">
+                      {row.withdrawnFromSavings > 0 ? (
+                        <span className="text-blue-400 font-medium">{formatCurrency(row.withdrawnFromSavings)}</span>
+                      ) : (
+                        <span className="text-slate-600">-</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-3 text-right">
+                      {row.estimatedTaxes > 0 ? (
+                        <span className="text-red-400">{formatCurrency(row.estimatedTaxes)}</span>
+                      ) : (
+                        <span className="text-slate-600">-</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-3 text-right font-semibold text-white">
+                      {row.totalCapital > 0 ? formatCurrency(row.totalCapital) : <span className="text-red-500">Agotado</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
         )}
 
       </div>
