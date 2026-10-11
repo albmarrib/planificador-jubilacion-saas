@@ -18,3 +18,45 @@ body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   @apply bg-slate-50 text-slate-900;
 }
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 10mm;
+  }
+  
+  html, body {
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Force background colors and SVG strokes in print */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Completely disable sticky positioning on print */
+  .sticky, header, thead {
+    position: static !important;
+    top: auto !important;
+  }
+
+  /* Table pagination rules */
+  table {
+    page-break-inside: auto;
+  }
+  tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+  thead {
+    display: table-header-group !important;
+  }
+  tfoot {
+    display: table-footer-group !important;
+  }
+}
+

@@ -1,6 +1,6 @@
-import { useState, useMemo, useEffect } from 'react'
-import { Plus, Trash2, TrendingDown, PiggyBank, Calculator, Table, Info, X, Settings, Save, Download, ExternalLink, LayoutDashboard, Briefcase, List, ArrowLeft } from 'lucide-react'
-import { LineChart, Line, Legend, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
+import { useState, useMemo, useEffect, useRef } from 'react'
+import { Plus, Trash2, TrendingDown, PiggyBank, Calculator, Table, Info, X, Settings, Save, Download, ExternalLink, LayoutDashboard, Briefcase, List, ArrowLeft, FileText } from 'lucide-react'
+import { LineChart, Line, Legend, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, ComposedChart } from 'recharts'
 import * as XLSX from 'xlsx'
 import { projectRetirement, calculateRequiredReturn } from './calculationEngine'
 import { addDoc, doc, setDoc, collection } from 'firebase/firestore'
@@ -9,11 +9,11 @@ import { db, auth } from './firebase'
 export default function Simulator({ client, scenario, onBack }) {
   const [config, setConfig] = useState({
     retirementDate: '2030-12-16',
-    pensionMonthly: 1500,
+    pensionMonthly: 0,
     inflationRate: 2.0,
     rentInflationRate: 2.0,
     realEstateAppreciationRate: 2.0,
-    currentAge: 65,
+    currentAge: client?.age || 65,
     endAge: 85,
     generalTaxBrackets: [
       { limit: 12450, rate: 0.19 },
@@ -36,24 +36,22 @@ export default function Simulator({ client, scenario, onBack }) {
   const [activeTab, setActiveTab] = useState('dashboard')
 
   const [desiredIncomeStages, setDesiredIncomeStages] = useState([
-    { id: 1, startAge: 65, endAge: 75, amount: 4000 },
-    { id: 2, startAge: 76, endAge: 85, amount: 3000 }
+    { id: 1, startAge: client?.age || 65, endAge: 85, amount: 0 }
   ])
 
-  const [savings, setSavings] = useState([
-    { id: 1, name: 'Fondo Indexado S&P 500', amount: 150000, expectedReturn: 7.0, type: 'savings' },
-    { id: 2, name: 'Cuenta Corriente', amount: 20000, expectedReturn: 0.5, type: 'savings' },
-    { id: 3, name: 'Plan de Pensiones', amount: 45000, expectedReturn: 4.0, type: 'pension_plan' },
-    { id: 4, name: 'Piso Alquilado Centro', amount: 250000, acquisitionPrice: 150000, expectedSaleYear: 2040, isPrimaryResidence: false, isRented: true, grossMonthlyRent: 1200, expensePercentage: 20, type: 'real_estate' }
-  ])
+  const [savings, setSavings] = useState([])
 
   useEffect(() => {
     if (scenario && !scenario.isNew) {
       if (scenario.config) setConfig(scenario.config);
       if (scenario.desiredIncomeStages) setDesiredIncomeStages(scenario.desiredIncomeStages);
       if (scenario.savings) setSavings(scenario.savings);
+    } else {
+      setSavings([]);
+      setConfig(prev => ({ ...prev, pensionMonthly: 0, currentAge: client?.age || 65 }));
+      setDesiredIncomeStages([{ id: 1, startAge: client?.age || 65, endAge: 85, amount: 0 }]);
     }
-  }, [scenario]);
+  }, [scenario, client]);
 
   const handleConfigChange = (e) => {
     const { name, value } = e.target
@@ -280,6 +278,10 @@ export default function Simulator({ client, scenario, onBack }) {
     XLSX.writeFile(workbook, `Plan_Rescate_Optimizado.xlsx`);
   }
 
+  const handleGeneratePDF = () => {
+    window.print();
+  };
+
   const [requiredReturnResult, setRequiredReturnResult] = useState(null);
 
   useEffect(() => {
@@ -327,99 +329,115 @@ export default function Simulator({ client, scenario, onBack }) {
 
   const liquidityCrisisData = chartData.find(d => d.uncoveredDeficit > 0.01);
   const liquidityCrisisYear = liquidityCrisisData?.year;
-  const zeroCapitalYear = chartData.find(d => d.totalCapital <= 0)?.year;
-  const hasError = liquidityCrisisYear || zeroCapitalYear;
   const currentTotalSavings = savings.reduce((acc, s) => acc + (parseFloat(s.amount) || 0), 0);
+  const zeroCapitalYear = currentTotalSavings > 0 
+    ? chartData.find(d => d.totalCapital <= 0)?.year 
+    : (chartData.some(d => d.desiredIncome > 0 && d.uncoveredDeficit > 0.01) ? chartData[0]?.year : null);
+  const hasError = Boolean(liquidityCrisisYear || zeroCapitalYear);
 
   const formatCurrency = (value) => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(value);
 
+  const initialLiquidCapital = savings.reduce((acc, s) => acc + (s.type !== 'real_estate' ? (parseFloat(s.amount) || 0) : 0), 0);
+  const initialRealEstateCapital = savings.reduce((acc, s) => acc + (s.type === 'real_estate' ? (parseFloat(s.amount) || 0) : 0), 0);
+
   return (
-    <div className="min-h-screen px-4 pb-4 md:px-8 md:pb-8 pt-0 font-sans bg-slate-950 text-slate-200 selection:bg-primary-500/30">
-      <div className="max-w-[1400px] mx-auto space-y-6">
-        
-        <header className="sticky top-0 z-40 bg-slate-950/95 backdrop-blur-sm border-b border-slate-800 pt-4 md:pt-8 pb-0 mb-6 -mx-4 md:-mx-8 px-4 md:px-8">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 pb-0">
-            {/* Left side: Title + Tabs */}
-            <div className="flex flex-col gap-4">
-              <div className="flex items-center gap-4 flex-wrap">
-                <button 
-                  onClick={onBack}
-                  className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors flex-shrink-0"
-                  title="Volver"
-                >
-                  <ArrowLeft className="w-5 h-5" />
-                </button>
-                <h1 className="text-2xl md:text-3xl font-bold text-white flex items-center gap-3">
-                  <Calculator className="w-7 h-7 text-primary-500" />
-                  Planificador de Jubilación
-                </h1>
-                {client && (
-                  <span className="px-3 py-1 bg-slate-800 text-primary-400 text-sm font-medium rounded-full border border-primary-900/50">
-                    Cliente: {client.name}
-                  </span>
-                )}
-                <div className="flex gap-2">
+    <div className="min-h-screen font-sans bg-slate-950 text-slate-200 selection:bg-primary-500/30 print:bg-white print:text-black">
+      
+      {/* =========================================================================
+          SECCIÓN 1: INTERFAZ INTERACTIVA PARA PANTALLA (OCULTA EN IMPRESIÓN)
+          ========================================================================= */}
+      <div className="print:hidden px-4 pb-4 md:px-8 md:pb-8 pt-0">
+        <div className="max-w-[1400px] mx-auto space-y-6">
+          <header className="sticky top-0 z-40 bg-slate-950/95 backdrop-blur-sm border-b border-slate-800 pt-4 md:pt-8 pb-0 mb-6 -mx-4 md:-mx-8 px-4 md:px-8">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 pb-0">
+              {/* Left side: Title + Tabs */}
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center gap-4 flex-wrap">
                   <button 
-                    onClick={() => setIsGlobalModalOpen(true)}
-                    className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-full transition-colors flex-shrink-0"
-                    title="Ajustes Globales"
+                    onClick={onBack}
+                    className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors flex-shrink-0"
+                    title="Volver"
                   >
-                    <Settings className="w-5 h-5" />
+                    <ArrowLeft className="w-5 h-5" />
+                  </button>
+                  <h1 className="text-2xl md:text-3xl font-bold text-white flex items-center gap-3">
+                    <Calculator className="w-7 h-7 text-primary-500" />
+                    Planificador de Jubilación
+                  </h1>
+                  {client && (
+                    <span className="px-3 py-1 bg-slate-800 text-primary-400 text-sm font-medium rounded-full border border-primary-900/50">
+                      Cliente: {client.name}
+                    </span>
+                  )}
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => setIsGlobalModalOpen(true)}
+                      className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-full transition-colors flex-shrink-0"
+                      title="Ajustes Globales"
+                    >
+                      <Settings className="w-5 h-5" />
+                    </button>
+                    <button 
+                      onClick={() => setIsModalOpen(true)}
+                      className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-full transition-colors flex-shrink-0"
+                      title="Documentación Técnica"
+                    >
+                      <Info className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+                
+                {/* Tabs Navigation now integrated in header to save vertical space */}
+                <div className="flex space-x-1 mt-2">
+                  <button 
+                    onClick={() => setActiveTab('dashboard')}
+                    className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-all rounded-t-lg border-x border-t border-b-2 ${activeTab === 'dashboard' ? 'text-primary-400 border-slate-700 border-b-primary-500 bg-slate-900 drop-shadow-[0_0_8px_rgba(56,189,248,0.3)]' : 'text-slate-400 border-slate-800 border-b-transparent bg-slate-950 hover:text-slate-200 hover:bg-slate-900'}`}
+                  >
+                    <LayoutDashboard className="w-4 h-4" /> Panel de Control
                   </button>
                   <button 
-                    onClick={() => setIsModalOpen(true)}
-                    className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-full transition-colors flex-shrink-0"
-                    title="Documentación Técnica"
+                    onClick={() => setActiveTab('assets')}
+                    className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-all rounded-t-lg border-x border-t border-b-2 ${activeTab === 'assets' ? 'text-primary-400 border-slate-700 border-b-primary-500 bg-slate-900 drop-shadow-[0_0_8px_rgba(56,189,248,0.3)]' : 'text-slate-400 border-slate-800 border-b-transparent bg-slate-950 hover:text-slate-200 hover:bg-slate-900'}`}
                   >
-                    <Info className="w-5 h-5" />
+                    <Briefcase className="w-4 h-4" /> Mi Patrimonio
+                  </button>
+                  <button 
+                    onClick={() => setActiveTab('plan')}
+                    className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-all rounded-t-lg border-x border-t border-b-2 ${activeTab === 'plan' ? 'text-primary-400 border-slate-700 border-b-primary-500 bg-slate-900 drop-shadow-[0_0_8px_rgba(56,189,248,0.3)]' : 'text-slate-400 border-slate-800 border-b-transparent bg-slate-950 hover:text-slate-200 hover:bg-slate-900'}`}
+                  >
+                    <List className="w-4 h-4" /> Plan de Rescate
                   </button>
                 </div>
               </div>
-              
-              {/* Tabs Navigation now integrated in header to save vertical space */}
-              <div className="flex space-x-1 mt-2">
-                <button 
-                  onClick={() => setActiveTab('dashboard')}
-                  className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-all rounded-t-lg border-x border-t border-b-2 ${activeTab === 'dashboard' ? 'text-primary-400 border-slate-700 border-b-primary-500 bg-slate-900 drop-shadow-[0_0_8px_rgba(56,189,248,0.3)]' : 'text-slate-400 border-slate-800 border-b-transparent bg-slate-950 hover:text-slate-200 hover:bg-slate-900'}`}
-                >
-                  <LayoutDashboard className="w-4 h-4" /> Panel de Control
-                </button>
-                <button 
-                  onClick={() => setActiveTab('assets')}
-                  className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-all rounded-t-lg border-x border-t border-b-2 ${activeTab === 'assets' ? 'text-primary-400 border-slate-700 border-b-primary-500 bg-slate-900 drop-shadow-[0_0_8px_rgba(56,189,248,0.3)]' : 'text-slate-400 border-slate-800 border-b-transparent bg-slate-950 hover:text-slate-200 hover:bg-slate-900'}`}
-                >
-                  <Briefcase className="w-4 h-4" /> Mi Patrimonio
-                </button>
-                <button 
-                  onClick={() => setActiveTab('plan')}
-                  className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-all rounded-t-lg border-x border-t border-b-2 ${activeTab === 'plan' ? 'text-primary-400 border-slate-700 border-b-primary-500 bg-slate-900 drop-shadow-[0_0_8px_rgba(56,189,248,0.3)]' : 'text-slate-400 border-slate-800 border-b-transparent bg-slate-950 hover:text-slate-200 hover:bg-slate-900'}`}
-                >
-                  <List className="w-4 h-4" /> Plan de Rescate
-                </button>
+
+              {/* Right side: Save/Load + Patrimonio */}
+              <div className="flex flex-col items-end gap-3 pb-3">
+                <div className="flex items-center gap-2">
+                  <button 
+                    onClick={handleGeneratePDF}
+                    className="flex items-center gap-1.5 text-xs bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/30 px-3 py-1.5 rounded-lg transition-colors font-medium"
+                    title="Generar Expediente PDF para el cliente"
+                  >
+                    <FileText className="w-3.5 h-3.5" /> Informe PDF
+                  </button>
+                  <button onClick={handleSaveScenario} className="flex items-center gap-2 text-xs bg-blue-600/20 text-blue-400 px-3 py-1.5 rounded-lg hover:bg-blue-600/30 transition-colors">
+                    <Save className="w-3.5 h-3.5" /> Guardar Escenario
+                  </button>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold mb-0.5">Patrimonio Inicial</p>
+                  <p className="text-2xl font-bold text-white leading-none">{formatCurrency(currentTotalSavings)}</p>
+                </div>
               </div>
             </div>
+          </header>
 
-            {/* Right side: Save/Load + Patrimonio */}
-            <div className="flex flex-col items-end gap-3 pb-3">
-              <div className="flex gap-2">
-                <button onClick={handleSaveScenario} className="flex items-center gap-2 text-xs bg-blue-600/20 text-blue-400 px-3 py-1.5 rounded-lg hover:bg-blue-600/30 transition-colors">
-                  <Save className="w-3.5 h-3.5" /> Guardar Escenario
-                </button>
-              </div>
-              <div className="text-right">
-                <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold mb-0.5">Patrimonio Inicial</p>
-                <p className="text-2xl font-bold text-white leading-none">{formatCurrency(currentTotalSavings)}</p>
-              </div>
-            </div>
-          </div>
-        </header>
-
-        {/* TOP ROW: Config (1 col) + Chart (2 cols) */}
-        {activeTab === 'dashboard' && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* TOP ROW: Config (1 col) + Chart (2 cols) */}
+          {activeTab === 'dashboard' && (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           
           {/* Panel de Configuración */}
-          <div className="lg:col-span-1 bg-slate-900 p-6 rounded-2xl shadow-xl border border-slate-800">
+          <div className="lg:col-span-1 bg-slate-900 p-6 rounded-2xl shadow-xl border border-slate-800 print:hidden">
             <h2 className="text-lg font-semibold mb-5 flex items-center gap-2 text-white">
               <TrendingDown className="w-5 h-5 text-primary-500" />
               Parámetros Globales
@@ -537,25 +555,27 @@ export default function Simulator({ client, scenario, onBack }) {
           </div>
 
           {/* Gráfica principal */}
-          <div className="lg:col-span-2 space-y-6">
-            <div className={`p-5 rounded-2xl shadow-xl border ${hasError ? 'bg-red-950/30 border-red-900/50' : 'bg-emerald-950/30 border-emerald-900/50'}`}>
-              {liquidityCrisisYear && liquidityCrisisData?.capitalIliquido > 0 ? (
-                <div>
-                  <h3 className="text-lg font-semibold text-red-400 flex items-center gap-2">🚨 Bloqueo de Liquidez (Inicia en Año {liquidityCrisisYear})</h3>
-                  <p className="text-red-300 mt-1">Tus ahorros líquidos se han agotado. Posees patrimonio inmovilizado, pero sufres un desfase de tesorería y no puedes pagar el día a día hasta que lo vendas.</p>
-                </div>
-              ) : liquidityCrisisYear || zeroCapitalYear ? (
-                <div>
-                  <h3 className="text-lg font-semibold text-red-400 flex items-center gap-2">🚨 Quiebra Patrimonial (Año {liquidityCrisisYear || zeroCapitalYear})</h3>
-                  <p className="text-red-300 mt-1">Tu capital se ha agotado por completo. La inflación y tus gastos han superado la rentabilidad de tus ahorros. Necesitas reducir urgentemente el 'Ingreso Deseado' en tus tramos de vida para hacer viable este escenario.</p>
-                </div>
-              ) : (
-                <div>
-                  <h3 className="text-lg font-semibold text-emerald-400 flex items-center gap-2">✅ Proyección Sostenible</h3>
-                  <p className="text-emerald-300 mt-1">El patrimonio cubre la esperanza de vida hasta los {config.endAge} años sin agotarse.</p>
-                </div>
-              )}
-            </div>
+          <div className="lg:col-span-2 space-y-6 print:w-full print:space-y-6">
+            {(currentTotalSavings > 0 || (config.pensionMonthly || 0) > 0 || desiredIncomeStages.some(s => (s.amount || 0) > 0)) && (
+              <div className={`p-5 rounded-2xl shadow-xl border print:hidden ${hasError ? 'bg-red-950/30 border-red-900/50' : 'bg-emerald-950/30 border-emerald-900/50'}`}>
+                {liquidityCrisisYear && liquidityCrisisData?.capitalIliquido > 0 ? (
+                  <div>
+                    <h3 className="text-lg font-semibold text-red-400 flex items-center gap-2">🚨 Bloqueo de Liquidez (Inicia en Año {liquidityCrisisYear})</h3>
+                    <p className="text-red-300 mt-1">Tus ahorros líquidos se han agotado. Posees patrimonio inmovilizado, pero sufres un desfase de tesorería y no puedes pagar el día a día hasta que lo vendas.</p>
+                  </div>
+                ) : liquidityCrisisYear || zeroCapitalYear ? (
+                  <div>
+                    <h3 className="text-lg font-semibold text-red-400 flex items-center gap-2">🚨 Quiebra Patrimonial (Año {liquidityCrisisYear || zeroCapitalYear})</h3>
+                    <p className="text-red-300 mt-1">Tu capital se ha agotado por completo. La inflación y tus gastos han superado la rentabilidad de tus ahorros. Necesitas reducir urgentemente el 'Ingreso Deseado' en tus tramos de vida para hacer viable este escenario.</p>
+                  </div>
+                ) : (
+                  <div>
+                    <h3 className="text-lg font-semibold text-emerald-400 flex items-center gap-2">✅ Proyección Sostenible</h3>
+                    <p className="text-emerald-300 mt-1">El patrimonio cubre la esperanza de vida hasta los {config.endAge} años sin agotarse.</p>
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="mt-4">
               <button 
@@ -637,24 +657,30 @@ export default function Simulator({ client, scenario, onBack }) {
               )}
             </div>
 
-            <div className="bg-slate-900 p-6 rounded-2xl shadow-xl border border-slate-800 h-[430px] flex flex-col">
-              <h2 className="text-lg font-semibold text-white mb-6">Evolución del Patrimonio</h2>
-              <div className="flex-1 min-h-0">
+            {/* PRIMER GRÁFICO: Evolución del Patrimonio */}
+            <div 
+              id="patrimonio-chart" 
+              className="bg-slate-900 print:bg-white print:border-slate-300 print:shadow-none p-6 rounded-2xl shadow-xl border border-slate-800 h-[430px] print:h-[300px] print:w-full flex flex-col print:break-inside-avoid print:mb-6"
+            >
+              <h2 className="text-lg font-semibold mb-6 text-white print:text-slate-900">
+                Evolución del Patrimonio
+              </h2>
+              <div className="flex-1 min-h-0 w-full h-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={chartData} margin={{ top: 20, right: 10, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" />
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#cbd5e1" strokeOpacity={0.4} />
                     <XAxis 
                       dataKey="year" 
                       axisLine={false}
                       tickLine={false}
-                      tick={{ fill: '#94a3b8' }}
+                      tick={{ fill: '#64748b' }}
                       dy={10}
                     />
                     <YAxis 
                       tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`} 
                       axisLine={false}
                       tickLine={false}
-                      tick={{ fill: '#94a3b8' }}
+                      tick={{ fill: '#64748b' }}
                       dx={-10}
                     />
                     <Tooltip 
@@ -669,18 +695,20 @@ export default function Simulator({ client, scenario, onBack }) {
                       type="monotone" 
                       dataKey="capitalLiquido" 
                       name="Liquidez (Gastable)" 
-                      stroke="#3b82f6" 
-                      strokeWidth={4} 
+                      stroke="#2563eb" 
+                      strokeWidth={3.5} 
                       dot={false} 
+                      isAnimationActive={false}
                     />
                     <Line 
                       type="monotone" 
                       dataKey="capitalIliquido" 
                       name="Ladrillo (Inmovilizado)" 
-                      stroke="#94a3b8" 
+                      stroke="#64748b" 
                       strokeWidth={2} 
                       strokeDasharray="5 5" 
                       dot={false} 
+                      isAnimationActive={false}
                     />
                   </LineChart>
                 </ResponsiveContainer>
@@ -688,29 +716,36 @@ export default function Simulator({ client, scenario, onBack }) {
             </div>
 
             {/* SEGUNDO GRÁFICO: Flujo de Caja y Nivel de Vida Mensual */}
-            <div className="bg-slate-900 p-6 rounded-2xl shadow-xl border border-slate-800 h-[430px] flex flex-col">
+            <div 
+              id="cashflow-chart" 
+              className="bg-slate-900 print:bg-white print:border-slate-300 print:shadow-none p-6 rounded-2xl shadow-xl border border-slate-800 h-[430px] print:h-[300px] print:w-full flex flex-col print:break-inside-avoid print:mb-6"
+            >
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-6">
                 <div>
-                  <h2 className="text-lg font-semibold text-white">Evolución de tu Nivel de Vida Mensual</h2>
-                  <p className="text-xs text-slate-400 mt-0.5">Ingreso neto deseado vs. flujo de caja neto real disponible</p>
+                  <h2 className="text-lg font-semibold text-white print:text-slate-900">
+                    Evolución de tu Nivel de Vida Mensual
+                  </h2>
+                  <p className="text-xs mt-0.5 text-slate-400 print:text-slate-600">
+                    Ingreso neto deseado vs. flujo de caja neto real disponible
+                  </p>
                 </div>
               </div>
-              <div className="flex-1 min-h-0">
+              <div className="flex-1 min-h-0 w-full h-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={chartData} margin={{ top: 20, right: 10, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" />
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#cbd5e1" strokeOpacity={0.4} />
                     <XAxis 
                       dataKey="year" 
                       axisLine={false}
                       tickLine={false}
-                      tick={{ fill: '#94a3b8' }}
+                      tick={{ fill: '#64748b' }}
                       dy={10}
                     />
                     <YAxis 
                       tickFormatter={(value) => `${value >= 1000 ? (value / 1000).toFixed(1) + 'k' : value}€`} 
                       axisLine={false}
                       tickLine={false}
-                      tick={{ fill: '#94a3b8' }}
+                      tick={{ fill: '#64748b' }}
                       dx={-10}
                     />
                     <Tooltip 
@@ -726,18 +761,20 @@ export default function Simulator({ client, scenario, onBack }) {
                       type="monotone" 
                       dataKey="desiredMonthlyIncome" 
                       name="Ingreso Deseado (Mes)" 
-                      stroke="#f87171" 
+                      stroke="#dc2626" 
                       strokeWidth={2} 
                       strokeDasharray="5 5" 
                       dot={false} 
+                      isAnimationActive={false}
                     />
                     <Line 
                       type="monotone" 
                       dataKey="realMonthlyIncome" 
                       name="Ingreso Real Disponible (Mes)" 
-                      stroke="#10b981" 
-                      strokeWidth={3.5} 
+                      stroke="#059669" 
+                      strokeWidth={3} 
                       dot={false} 
+                      isAnimationActive={false}
                     />
                   </LineChart>
                 </ResponsiveContainer>
@@ -748,9 +785,8 @@ export default function Simulator({ client, scenario, onBack }) {
         )}
 
         {/* MIDDLE ROW: Savings Cards Grid */}
-        {activeTab === 'assets' && (
-          <div className="bg-slate-900 p-6 rounded-2xl shadow-xl border border-slate-800">
-          <div className="sticky top-[95px] md:top-[115px] z-30 bg-slate-900/95 backdrop-blur-md flex justify-between items-center mb-6 py-4 px-2 -mx-2 border-b border-slate-800">
+        <div className={`bg-slate-900 p-6 rounded-2xl shadow-xl border border-slate-800 print:hidden ${activeTab === 'assets' ? 'block' : 'hidden'}`}>
+          <div className="flex justify-between items-center mb-6 py-4 px-2 -mx-2 border-b border-slate-800">
             <h2 className="text-xl font-semibold flex items-center gap-2 text-white">
               <PiggyBank className="w-5 h-5 text-primary-500" />
               Cartera de Activos
@@ -907,96 +943,307 @@ export default function Simulator({ client, scenario, onBack }) {
               ))}
             </div>
           )}
-          </div>
-        )}
-
-        {/* BOTTOM ROW: Rescue Plan Table */}
-        {activeTab === 'plan' && (
-          <div className="bg-slate-900 rounded-2xl shadow-xl border border-slate-800">
-          <div className="sticky top-[95px] md:top-[115px] z-30 bg-slate-900/95 backdrop-blur-md p-6 py-4 border-b border-slate-800 rounded-t-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <div>
-              <h2 className="text-xl font-semibold flex items-center gap-2 text-white">
-                <Table className="w-5 h-5 text-primary-500" />
-                Plan de Rescate Optimizado
-              </h2>
-              <p className="text-slate-400 text-sm mt-1">
-                Desglose anual priorizando retiros de Planes de Pensiones hasta el límite óptimo del tramo de IRPF.
-              </p>
-            </div>
-            <button 
-              onClick={handleExportExcel}
-              className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 hover:border-slate-600 px-4 py-2 rounded-lg font-medium text-sm transition-colors whitespace-nowrap"
-            >
-              <Download className="w-4 h-4" />
-              Exportar Excel
-            </button>
-          </div>
-          
-          <div className="max-w-full">
-            <table className="w-full text-left text-sm whitespace-nowrap">
-              <thead className="bg-slate-950/90 backdrop-blur-sm text-slate-400 font-semibold uppercase text-xs tracking-wider sticky top-[175px] md:top-[195px] z-20 shadow-md">
-                <tr>
-                  <th className="px-6 py-4">Año (Edad)</th>
-                  <th className="px-6 py-4 text-right text-emerald-400">Ingreso Neto Real (Mes)</th>
-                  <th className="px-6 py-4 text-right">Ingresos Alquiler</th>
-                  <th className="px-6 py-4 text-right">Faltante a cubrir</th>
-                  <th className="px-6 py-4 text-right text-emerald-400">Rescate Plan Pensiones</th>
-                  <th className="px-6 py-4 text-right text-blue-400">Rescate Fondos</th>
-                  <th className="px-6 py-4 text-right text-red-400">Impuestos Estimados</th>
-                  <th className="px-6 py-4 text-right">Capital Restante</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/50 text-slate-300">
-                {chartData.map((row, index) => (
-                  <tr key={row.year} className="hover:bg-slate-800/50 transition-colors">
-                    <td className="px-6 py-3 font-medium text-white">
-                      {row.year} <span className="text-slate-500 font-normal">({row.age}a)</span>
-                    </td>
-                    <td className={`px-6 py-3 text-right font-bold ${row.uncoveredDeficit > 0.01 ? 'text-amber-400' : 'text-emerald-400'}`}>
-                      {formatCurrency(row.realMonthlyIncome)}
-                    </td>
-                    <td className="px-6 py-3 text-right text-purple-400 font-medium">
-                      {row.rentIncome > 0 ? formatCurrency(row.rentIncome) : <span className="text-slate-600">-</span>}
-                    </td>
-                    <td className={`px-6 py-3 text-right ${row.uncoveredDeficit > 0.01 ? 'text-red-500 font-bold' : 'text-slate-400'}`}>
-                      {formatCurrency(row.gap)}
-                    </td>
-                    <td className="px-6 py-3 text-right">
-                      {row.withdrawnFromPension > 0 ? (
-                        <span className="text-emerald-400 font-medium">{formatCurrency(row.withdrawnFromPension)}</span>
-                      ) : (
-                        <span className="text-slate-600">-</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-3 text-right">
-                      {row.withdrawnFromSavings > 0 ? (
-                        <span className="text-blue-400 font-medium">{formatCurrency(row.withdrawnFromSavings)}</span>
-                      ) : (
-                        <span className="text-slate-600">-</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-3 text-right">
-                      {row.estimatedTaxes > 0 ? (
-                        <span className="text-red-400">{formatCurrency(row.estimatedTaxes)}</span>
-                      ) : (
-                        <span className="text-slate-600">-</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-3 text-right font-semibold text-white">
-                      {row.totalCapital > 0 ? formatCurrency(row.totalCapital) : <span className="text-red-500">Agotado</span>}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
         </div>
+
+        {/* BOTTOM ROW: Rescue Plan Table (Pantalla interactiva) */}
+        {activeTab === 'plan' && (
+          <div className="bg-slate-900 p-6 rounded-2xl shadow-xl border border-slate-800">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 pb-4 border-b border-slate-800">
+              <div>
+                <h2 className="text-xl font-semibold flex items-center gap-2 text-white">
+                  <Table className="w-5 h-5 text-primary-500" />
+                  Plan de Rescate Optimizado
+                </h2>
+                <p className="text-slate-400 text-sm mt-1">
+                  Desglose anual priorizando retiros de Planes de Pensiones hasta el límite óptimo del tramo de IRPF.
+                </p>
+              </div>
+              <div className="flex items-center gap-3 flex-wrap">
+                <button 
+                  onClick={handleExportExcel}
+                  className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 hover:border-slate-600 px-4 py-2 rounded-lg font-medium text-sm transition-colors whitespace-nowrap"
+                >
+                  <Download className="w-4 h-4" />
+                  Exportar Excel
+                </button>
+                <button 
+                  onClick={handleGeneratePDF}
+                  className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-950/40 border border-emerald-500 px-4 py-2 rounded-lg font-medium text-sm transition-all whitespace-nowrap"
+                >
+                  <FileText className="w-4 h-4" />
+                  Generar Informe PDF
+                </button>
+              </div>
+            </div>
+            
+            <div className="w-full overflow-x-auto">
+              <table className="w-full text-left text-sm table-fixed border-collapse">
+                <thead className="bg-slate-950 text-slate-400 font-semibold uppercase text-xs tracking-wider border-b border-slate-800">
+                  <tr>
+                    <th className="py-3.5 px-3 text-left w-[11%]">Año (Edad)</th>
+                    <th className="py-3.5 px-3 text-right text-emerald-400 w-[14%]">Ingreso Neto Real (Mes)</th>
+                    <th className="py-3.5 px-3 text-right w-[11%]">Alquileres</th>
+                    <th className="py-3.5 px-3 text-right w-[12%]">Faltante</th>
+                    <th className="py-3.5 px-3 text-right text-emerald-400 w-[13%]">Plan Pensiones</th>
+                    <th className="py-3.5 px-3 text-right text-blue-400 w-[12%]">Fondos</th>
+                    <th className="py-3.5 px-3 text-right text-red-400 w-[12%]">Impuestos</th>
+                    <th className="py-3.5 px-3 text-right w-[15%]">Capital Restante</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/50 text-slate-300">
+                  {chartData.map((row) => (
+                    <tr key={row.year} className="hover:bg-slate-800/50">
+                      <td className="py-3 px-3 font-medium text-white whitespace-nowrap">
+                        {row.year} <span className="text-slate-500 font-normal">({row.age}a)</span>
+                      </td>
+                      <td className={`py-3 px-3 text-right font-bold tabular-nums whitespace-nowrap ${row.uncoveredDeficit > 0.01 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                        {formatCurrency(row.realMonthlyIncome)}
+                      </td>
+                      <td className="py-3 px-3 text-right text-purple-400 font-medium tabular-nums whitespace-nowrap">
+                        {row.rentIncome > 0 ? formatCurrency(row.rentIncome) : <span className="text-slate-600">-</span>}
+                      </td>
+                      <td className={`py-3 px-3 text-right tabular-nums whitespace-nowrap ${row.uncoveredDeficit > 0.01 ? 'text-red-500 font-bold' : 'text-slate-400'}`}>
+                        {formatCurrency(row.gap)}
+                      </td>
+                      <td className="py-3 px-3 text-right tabular-nums whitespace-nowrap">
+                        {row.withdrawnFromPension > 0 ? (
+                          <span className="text-emerald-400 font-medium">{formatCurrency(row.withdrawnFromPension)}</span>
+                        ) : (
+                          <span className="text-slate-600">-</span>
+                        )}
+                      </td>
+                      <td className="py-3 px-3 text-right tabular-nums whitespace-nowrap">
+                        {row.withdrawnFromSavings > 0 ? (
+                          <span className="text-blue-400 font-medium">{formatCurrency(row.withdrawnFromSavings)}</span>
+                        ) : (
+                          <span className="text-slate-600">-</span>
+                        )}
+                      </td>
+                      <td className="py-3 px-3 text-right tabular-nums whitespace-nowrap">
+                        {row.estimatedTaxes > 0 ? (
+                          <span className="text-red-400">{formatCurrency(row.estimatedTaxes)}</span>
+                        ) : (
+                          <span className="text-slate-600">-</span>
+                        )}
+                      </td>
+                      <td className="py-3 px-3 text-right font-semibold text-white tabular-nums whitespace-nowrap">
+                        {row.totalCapital > 0 ? formatCurrency(row.totalCapital) : <span className="text-red-500 font-bold">Agotado</span>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
         )}
 
       </div>
+    </div>
+
+    {/* =========================================================================
+        SECCIÓN 2: EXPEDIENTE OFICIAL DE JUBILACIÓN (EXCLUSIVO IMPRESIÓN A4 / PDF)
+        Totalmente independiente de la pantalla y de los tabs activos.
+        Renderizado con SVG de dimensiones fijas (sin ResponsiveContainer).
+        ========================================================================= */}
+    <div className="hidden print:block w-full max-w-[210mm] mx-auto text-slate-900 bg-white font-sans text-xs">
+      
+      {/* PÁGINA 1: PORTADA, RESUMEN EJECUTIVO Y GRÁFICOS */}
+      <div className="p-6">
+        {/* Encabezado Profesional */}
+        <div className="flex justify-between items-start border-b-2 border-slate-900 pb-4 mb-4">
+          <div>
+            <p className="text-[10px] tracking-widest font-black uppercase text-blue-700 mb-1">
+              INFORME TÉCNICO DE PLANIFICACIÓN PATRIMONIAL
+            </p>
+            <h1 className="text-2xl font-black text-slate-950 tracking-tight leading-tight">
+              Estudio de Viabilidad y Optimización Fiscal para la Jubilación
+            </h1>
+            <p className="text-xs text-slate-600 mt-1">
+              Estrategia de Rescate de Activos, Sostenibilidad Financiera y Eficiencia en IRPF
+            </p>
+          </div>
+          <div className="text-right text-[11px] text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-2.5 min-w-[210px] shrink-0">
+            <p><strong className="text-slate-900">Cliente:</strong> {client?.name || 'Cliente Particular'}</p>
+            {client?.dni && <p><strong className="text-slate-900">NIF/DNI:</strong> {client.dni}</p>}
+            <p><strong className="text-slate-900">Fecha Emisión:</strong> {new Date().toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
+            <p className="text-blue-700 font-semibold mt-1">Expediente Oficial</p>
+          </div>
+        </div>
+
+        {/* Resumen Ejecutivo (Radiografía Inicial en 4 KPI Cards) */}
+        <div className="grid grid-cols-4 gap-3 mb-4">
+          <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
+            <span className="block text-[10px] uppercase font-bold text-slate-500">Edad Jubilación</span>
+            <span className="text-base font-black text-slate-900">{config.currentAge} años</span>
+            <span className="block text-[10px] text-slate-500">Esp. Vida: {config.endAge} años</span>
+          </div>
+          <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
+            <span className="block text-[10px] uppercase font-bold text-slate-500">Pensión Estimada</span>
+            <span className="text-base font-black text-slate-900">{formatCurrency(config.pensionMonthly)}</span>
+            <span className="block text-[10px] text-slate-500">Bruto / mes (14 pagas)</span>
+          </div>
+          <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
+            <span className="block text-[10px] uppercase font-bold text-slate-500">Ingreso Objetivo</span>
+            <span className="text-base font-black text-emerald-700">{formatCurrency(desiredIncomeStages[0]?.amount || 0)}</span>
+            <span className="block text-[10px] text-slate-500">Neto / mes (IPC {config.inflationRate}%)</span>
+          </div>
+          <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
+            <span className="block text-[10px] uppercase font-bold text-slate-500">Patrimonio Inicial</span>
+            <span className="text-base font-black text-blue-700">{formatCurrency(currentTotalSavings)}</span>
+            <span className="block text-[10px] text-slate-500">Líq: {formatCurrency(initialLiquidCapital)}</span>
+          </div>
+        </div>
+
+        {/* Dictamen de Viabilidad Patrimonial */}
+        <div className="mb-4">
+          {hasError ? (
+            <div className="p-3 bg-red-50 border border-red-300 rounded-lg">
+              <p className="font-bold text-red-800 text-xs uppercase tracking-wide">
+                ⚠️ Dictamen: Riesgo de Agotamiento de Liquidez
+              </p>
+              <p className="text-[11px] text-red-700 mt-0.5 leading-relaxed">
+                El patrimonio líquido disponible para rescate se agota en el año <strong>{zeroCapitalYear || liquidityCrisisYear}</strong> (edad: {config.currentAge + ((zeroCapitalYear || liquidityCrisisYear) - new Date().getFullYear())} años).
+                {requiredReturnResult ? ` Para cubrir el 100% del nivel de vida proyectado sin reducir el gasto, la cartera requeriría una rentabilidad anualizada del ${requiredReturnResult}%.` : ''}
+              </p>
+            </div>
+          ) : (
+            <div className="p-3 bg-emerald-50 border border-emerald-300 rounded-lg">
+              <p className="font-bold text-emerald-800 text-xs uppercase tracking-wide">
+                ✓ Dictamen: Planificación Patrimonialmente Sostenible
+              </p>
+              <p className="text-[11px] text-emerald-700 mt-0.5 leading-relaxed">
+                El patrimonio acumulado y las rentas proyectadas cubren la totalidad del nivel de vida deseado durante todo el horizonte vital (hasta los {config.endAge} años).
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* GRÁFICO 1: EVOLUCIÓN DEL PATRIMONIO (VECTORIAL DIRECTO, SIN RESPONSIVECONTAINER) */}
+        <div className="mb-4 border border-slate-200 rounded-lg p-2.5 bg-white">
+          <h2 className="text-[11px] font-bold text-slate-900 uppercase tracking-wider mb-1.5">
+            1. Evolución del Patrimonio Acumulado (€)
+          </h2>
+          <div className="w-full flex justify-center">
+            <LineChart width={710} height={205} data={chartData} margin={{ top: 8, right: 15, left: 5, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+              <XAxis dataKey="year" tickLine={false} tick={{ fill: '#475569', fontSize: 10 }} />
+              <YAxis tickFormatter={(val) => `${(val / 1000).toFixed(0)}k`} tickLine={false} tick={{ fill: '#475569', fontSize: 10 }} />
+              <Legend verticalAlign="top" height={24} wrapperStyle={{ fontSize: '10px' }} />
+              <ReferenceLine y={0} stroke="#dc2626" strokeDasharray="3 3" />
+              <Line type="monotone" dataKey="capitalLiquido" name="Patrimonio Líquido (Gastable)" stroke="#2563eb" strokeWidth={2.5} dot={false} isAnimationActive={false} />
+              <Line type="monotone" dataKey="capitalIliquido" name="Inmobiliario (Inmovilizado)" stroke="#64748b" strokeWidth={1.5} strokeDasharray="4 4" dot={false} isAnimationActive={false} />
+            </LineChart>
+          </div>
+        </div>
+
+        {/* GRÁFICO 2: FLUJO DE CAJA Y NIVEL DE VIDA (VECTORIAL DIRECTO, SIN RESPONSIVECONTAINER) */}
+        <div className="border border-slate-200 rounded-lg p-2.5 bg-white">
+          <h2 className="text-[11px] font-bold text-slate-900 uppercase tracking-wider mb-1.5">
+            2. Nivel de Vida Mensual (Ingreso Deseado vs. Real Disponible €/mes)
+          </h2>
+          <div className="w-full flex justify-center">
+            <LineChart width={710} height={205} data={chartData} margin={{ top: 8, right: 15, left: 5, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+              <XAxis dataKey="year" tickLine={false} tick={{ fill: '#475569', fontSize: 10 }} />
+              <YAxis tickFormatter={(val) => `${val >= 1000 ? (val / 1000).toFixed(1) + 'k' : val}€`} tickLine={false} tick={{ fill: '#475569', fontSize: 10 }} />
+              <Legend verticalAlign="top" height={24} wrapperStyle={{ fontSize: '10px' }} />
+              <Line type="monotone" dataKey="desiredMonthlyIncome" name="Ingreso Deseado Objetivo (Mes)" stroke="#dc2626" strokeWidth={2} strokeDasharray="4 4" dot={false} isAnimationActive={false} />
+              <Line type="monotone" dataKey="realMonthlyIncome" name="Ingreso Real Disponible (Mes)" stroke="#059669" strokeWidth={2.5} dot={false} isAnimationActive={false} />
+            </LineChart>
+          </div>
+        </div>
+      </div>
+
+      {/* PÁGINA 2: PLAN DE RESCATE ANUAL (SALTO DE PÁGINA LIMPIO) */}
+      <div className="p-6 break-before-page">
+        <div className="border-b-2 border-slate-900 pb-3 mb-4">
+          <h2 className="text-base font-black text-slate-950 uppercase tracking-wide">
+            3. Desglose Anual del Plan de Rescate Optimizado
+          </h2>
+          <p className="text-[11px] text-slate-600 mt-0.5">
+            Cronograma de rescates anuales optimizando entre rentas del trabajo (planes de pensiones) y base del ahorro (fondos de inversión) para minimizar el impacto en el IRPF.
+          </p>
+        </div>
+
+        <table className="w-full text-left text-[10px] table-fixed border-collapse border border-slate-300">
+          <thead className="bg-slate-100 text-slate-900 font-bold border-b-2 border-slate-300">
+            <tr>
+              <th className="py-2 px-2 text-left w-[11%]">Año (Edad)</th>
+              <th className="py-2 px-2 text-right w-[14%]">Ingreso Real (Mes)</th>
+              <th className="py-2 px-2 text-right w-[11%]">Alquileres</th>
+              <th className="py-2 px-2 text-right w-[12%]">Faltante</th>
+              <th className="py-2 px-2 text-right w-[13%]">Plan Pensiones</th>
+              <th className="py-2 px-2 text-right w-[12%]">Fondos</th>
+              <th className="py-2 px-2 text-right w-[12%]">Impuestos</th>
+              <th className="py-2 px-2 text-right w-[15%]">Capital Restante</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-200">
+            {chartData.map((row) => (
+              <tr key={row.year} className="break-inside-avoid">
+                <td className="py-1.5 px-2 font-medium text-slate-950">
+                  {row.year} <span className="text-slate-500">({row.age}a)</span>
+                </td>
+                <td className={`py-1.5 px-2 text-right font-bold tabular-nums ${row.uncoveredDeficit > 0.01 ? 'text-amber-700' : 'text-emerald-700'}`}>
+                  {formatCurrency(row.realMonthlyIncome)}
+                </td>
+                <td className="py-1.5 px-2 text-right tabular-nums text-purple-700 font-medium">
+                  {row.rentIncome > 0 ? formatCurrency(row.rentIncome) : '-'}
+                </td>
+                <td className={`py-1.5 px-2 text-right tabular-nums ${row.uncoveredDeficit > 0.01 ? 'text-red-600 font-bold' : 'text-slate-600'}`}>
+                  {formatCurrency(row.gap)}
+                </td>
+                <td className="py-1.5 px-2 text-right tabular-nums text-emerald-700 font-medium">
+                  {row.withdrawnFromPension > 0 ? formatCurrency(row.withdrawnFromPension) : '-'}
+                </td>
+                <td className="py-1.5 px-2 text-right tabular-nums text-blue-700 font-medium">
+                  {row.withdrawnFromSavings > 0 ? formatCurrency(row.withdrawnFromSavings) : '-'}
+                </td>
+                <td className="py-1.5 px-2 text-right tabular-nums text-red-700">
+                  {row.estimatedTaxes > 0 ? formatCurrency(row.estimatedTaxes) : '-'}
+                </td>
+                <td className="py-1.5 px-2 text-right font-bold tabular-nums text-slate-950">
+                  {row.totalCapital > 0 ? formatCurrency(row.totalCapital) : <span className="text-red-600 font-extrabold">Agotado</span>}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        {/* ANEXO METODOLÓGICO */}
+        <div className="mt-6 pt-4 border-t-2 border-slate-300 break-inside-avoid space-y-3">
+          <h3 className="font-bold text-slate-900 text-xs uppercase tracking-wider">
+            Anexo Metodológico y Cláusulas Informativas
+          </h3>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="p-2.5 bg-slate-50 border border-slate-200 rounded">
+              <h4 className="font-bold text-slate-900 text-[10px] mb-0.5">1. Optimización Fiscal Progresiva</h4>
+              <p className="text-[9px] text-slate-600 leading-relaxed">
+                El algoritmo prioriza el rescate de fondos de inversión frente a planes de pensiones para evitar saltos en la base general del IRPF.
+              </p>
+            </div>
+            <div className="p-2.5 bg-slate-50 border border-slate-200 rounded">
+              <h4 className="font-bold text-slate-900 text-[10px] mb-0.5">2. Corrección por Inflación (IPC)</h4>
+              <p className="text-[9px] text-slate-600 leading-relaxed">
+                El nivel de vida y las rentas se indexan al {config.inflationRate}% acumulativo para preservar el poder adquisitivo real durante toda la jubilación.
+              </p>
+            </div>
+            <div className="p-2.5 bg-slate-50 border border-slate-200 rounded">
+              <h4 className="font-bold text-slate-900 text-[10px] mb-0.5">3. Riesgo de Liquidez ("House Rich")</h4>
+              <p className="text-[9px] text-slate-600 leading-relaxed">
+                El patrimonio inmovilizado en inmuebles no proporciona liquidez directa si no se enajena antes de que se agote el capital financiero.
+              </p>
+            </div>
+          </div>
+          <p className="text-[8px] text-slate-400 italic pt-1 border-t border-slate-200 leading-tight">
+            Aviso Legal: Informe de simulación orientativa calculado con los parámetros facilitados por el cliente y la normativa fiscal vigente. No constituye recomendación vinculante de inversión. Rentabilidades pasadas no garantizan rendimientos futuros.
+          </p>
+        </div>
+      </div>
+    </div>
 
       {isGlobalModalOpen && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 print:hidden">
           <div className="bg-slate-900 rounded-2xl border border-slate-700 shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
             <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-900/50 sticky top-0">
               <h2 className="text-xl font-bold text-white flex items-center gap-2">
@@ -1070,7 +1317,7 @@ export default function Simulator({ client, scenario, onBack }) {
       )}
 
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 print:hidden">
           <div className="bg-slate-900 rounded-2xl border border-slate-700 shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden">
             <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-900/50 sticky top-0">
               <h2 className="text-xl font-bold text-white flex items-center gap-2">
@@ -1168,12 +1415,23 @@ export default function Simulator({ client, scenario, onBack }) {
               </div>
 
               <div>
-                <h3 className="text-lg font-semibold text-white mb-2">7. Diagnóstico de Solvencia vs. Liquidez</h3>
-                <p>El sistema monitoriza constantemente el flujo de caja, diferenciando entre quiebra patrimonial y tensión de tesorería:</p>
-                <ul className="list-disc pl-5 mt-2 space-y-1">
-                  <li><strong className="text-slate-100">Quiebra Patrimonial:</strong> Agotamiento total de todos los activos (líquidos e ilíquidos). El motor exige una reducción inmediata del gasto o retraso en la edad de jubilación.</li>
-                  <li><strong className="text-slate-100">Bloqueo de Liquidez (House Rich, Cash Poor):</strong> Situación donde el usuario agota sus cuentas financieras, pero posee patrimonio inmobiliario latente programado para venta futura. El motor detecta el desfase temporal, aborta la búsqueda de rentabilidad (al no existir capital base) y alerta sobre la necesidad de adelantar enajenaciones o buscar financiación puente (Hipoteca Inversa) para sostener el plan.</li>
+                <h3 className="text-lg font-semibold text-white mb-2">7. Arquitectura Dual de Diagnóstico: Solvencia Patrimonial vs. Flujo de Caja</h3>
+                <p>El sistema incorpora un doble panel analítico para disociar la riqueza latente de la liquidez operativa (Ingreso Neto Real), previniendo escenarios de insolvencia técnica (House Rich, Cash Poor).</p>
+                <ul className="list-disc pl-5 mt-2 space-y-2">
+                  <li><strong className="text-slate-100">Gráfico 1: Evolución del Patrimonio (Solvencia):</strong> Monitoriza el balance general. Proyecta el saldo de los activos financieros (liquidez) y el valor latente de los activos inmobiliarios (ladrillo), reflejando la curva de capitalización y los picos de inyección de liquidez tras eventos de enajenación.</li>
+                  <li><strong className="text-slate-100">Gráfico 2: Nivel de Vida (Flujo de Caja):</strong> Un indicador dinámico que contrasta el "Ingreso Deseado Mensual" frente al flujo de caja operativo disponible.</li>
+                  <li><strong className="text-slate-100">Motor de Cálculo del Ingreso Neto Real:</strong> La métrica crítica del simulador se define mediante la siguiente ecuación integradora:
+                    <div className="my-2 p-2.5 bg-slate-950 rounded-lg border border-slate-800 text-xs font-mono text-emerald-400">
+                      Ingreso Neto Real (Mes) = (Pensión Neta Anual + Rentas Inmobiliarias Netas Anuales + Rescate Neto Anual de liquidez) / 12
+                    </div>
+                  </li>
+                  <li><strong className="text-slate-100">Detección de Caída de Nivel de Vida:</strong> Mientras exista capital líquido rescatable, el Ingreso Neto Real iguala al Ingreso Deseado. Ante el agotamiento de la liquidez, el motor cancela la extracción y el gráfico evidencia matemáticamente un "acantilado financiero", desplomando el nivel de vida mensual del usuario hasta el suelo vitalicio de la Pensión Neta + Rentas.</li>
                 </ul>
+              </div>
+
+              <div>
+                <h3 className="text-lg font-semibold text-white mb-2">8. Gestión B2B de Expedientes y Persistencia de Datos</h3>
+                <p>El sistema está diseñado para entornos de asesoría (SaaS) integrando conexión directa con bases de datos no relacionales (Firebase/Firestore). Permite archivar el "Estado Global" y la parametrización individual como un Expediente de Cliente, garantizando la recuperación, edición iterativa y seguimiento interanual del plan de jubilación sin pérdida de contexto ni reintroducción de datos.</p>
               </div>
 
               <div className="bg-slate-800/50 p-6 rounded-xl border border-slate-700/50 mt-8">
