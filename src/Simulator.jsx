@@ -454,7 +454,21 @@ export default function Simulator({ client, scenario, onBack }) {
                 />
               </div>
               <div className="col-span-2">
-                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Pensión Neta (Mes)</label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                    Pensión Pública Estimada (Bruta / Mes)
+                  </label>
+                  <a 
+                    href="https://sede-tu.seg-social.gob.es/wps/myportal/tussR/tuss/TrabajoPensiones/JubilacionCalculo/!ut/p/z1/pZHBaoNAEIafJQePcWaNWdvejIZsFBvFSsxeipatEawG17a0T98lIQRKsxUyt12-n-H7BzjkwNvio66Koe7aolHvHafPj8RdEpZivHoKPExYQLPQW5PUp7DVApQCH5PHK-PiuPw1IHPG5R3iW4ShFW8y28bECVlixyHBiNy23z_5a_S2wLUrIvoPQM-ArsMjoJEMgFdNV54O7rbl7K4C3otX0YvefO_V934YDvLBQAM_LVOKaiq7l7poTCEN_Cu07-QA-W8Wdqou5-KySSPlco8MA29hYYTHPrXA4S1Tk2O9nvLya_Y9dyeTHz9vHEE!/#Z7_N1AE1HS0POSMC0Q90H0JCB20M0" 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="text-xs text-primary-400 hover:text-primary-300 flex items-center gap-1 transition-colors"
+                    title="Consultar estimación oficial en el simulador de la Seguridad Social"
+                  >
+                    <span>Simulador Seg. Social</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
                 <input 
                   type="number" 
                   name="pensionMonthly"
@@ -462,6 +476,20 @@ export default function Simulator({ client, scenario, onBack }) {
                   onChange={handleConfigChange}
                   className="w-full rounded-lg border-slate-700 border p-2.5 text-sm outline-none focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500 transition-all bg-slate-950 text-white" 
                 />
+                <p className="text-[11px] text-slate-400 mt-1.5 leading-relaxed flex items-start gap-1.5">
+                  <Info className="w-3.5 h-3.5 text-primary-400 shrink-0 mt-0.5" />
+                  <span>
+                    Introduce el importe bruto en 14 pagas, tal como lo indica el{' '}
+                    <a 
+                      href="https://sede-tu.seg-social.gob.es/wps/myportal/tussR/tuss/TrabajoPensiones/JubilacionCalculo/!ut/p/z1/pZHBaoNAEIafJQePcWaNWdvejIZsFBvFSsxeipatEawG17a0T98lIQRKsxUyt12-n-H7BzjkwNvio66Koe7aolHvHafPj8RdEpZivHoKPExYQLPQW5PUp7DVApQCH5PHK-PiuPw1IHPG5R3iW4ShFW8y28bECVlixyHBiNy23z_5a_S2wLUrIvoPQM-ArsMjoJEMgFdNV54O7rbl7K4C3otX0YvefO_V934YDvLBQAM_LVOKaiq7l7poTCEN_Cu07-QA-W8Wdqou5-KySSPlco8MA29hYYTHPrXA4S1Tk2O9nvLya_Y9dyeTHz9vHEE!/#Z7_N1AE1HS0POSMC0Q90H0JCB20M0"
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-primary-400 hover:underline inline-flex items-center gap-0.5"
+                    >
+                      simulador de la Seguridad Social
+                    </a>.
+                  </span>
+                </p>
               </div>
             </div>
 
@@ -1020,7 +1048,7 @@ export default function Simulator({ client, scenario, onBack }) {
                     <code className="text-xs bg-slate-800 p-1 rounded">I_d(t) = I_d(t-1) * (1 + i)</code><br/>
                     <code className="text-xs bg-slate-800 p-1 rounded mt-1 inline-block">P(t) = P(t-1) * (1 + i)</code>
                   </li>
-                  <li><strong className="text-slate-100">Déficit Bruto ($D$):</strong> La diferencia anual requerida del patrimonio líquido. <code className="text-xs bg-slate-800 p-1 rounded">D = (I_d(t) * 12) - (P(t) * 12)</code>.</li>
+                  <li><strong className="text-slate-100">Déficit Neto a Cubrir ($D$):</strong> Diferencia requerida de los ahorros para alcanzar el estilo de vida deseado. Se calcula como el Ingreso Deseado Neto Anual menos la Pensión Neta Anual (obtenida tras aplicar el IRPF correspondiente de la Base General a la Pensión Bruta anual en 14 pagas).</li>
                 </ul>
               </div>
 
@@ -1097,10 +1125,10 @@ export default function Simulator({ client, scenario, onBack }) {
                     </ul>
                   </div>
                   <div>
-                    <h4 className="font-semibold text-slate-100">B. Pensión Neta / Pensión Máxima</h4>
+                    <h4 className="font-semibold text-slate-100">B. Pensión Pública Estimada (Bruta / 14 pagas)</h4>
                     <ul className="list-disc pl-5 mt-1 space-y-1">
-                      <li><strong className="text-slate-100">Qué es:</strong> Importe mensual de pensión pública revalorizada.</li>
-                      <li><strong className="text-slate-100">Dónde consultarlo:</strong> Seguridad Social (seg-social.es) o notificación oficial anual.</li>
+                      <li><strong className="text-slate-100">Qué es:</strong> Importe mensual bruto en 14 pagas estimado por el sistema público de la Seguridad Social. El motor deduce automáticamente su IRPF según los tramos generales para obtener la pensión neta de bolsillo y calcular el déficit con precisión.</li>
+                      <li><strong className="text-slate-100">Dónde consultarlo:</strong> Portal Tu Seguridad Social (sede-tu.seg-social.gob.es) o simulador oficial de jubilación.</li>
                     </ul>
                   </div>
                   <div>

@@ -38,7 +38,7 @@ export function projectRetirement(params) {
 
   const yearsToProject = endAge - currentAge + 1;
 
-  let currentPension = pensionMonthly * 12;
+  let currentPension = pensionMonthly * 14;
 
   // Copia profunda para no modificar el estado original de React
   let currentSavings = savings.map(s => ({ ...s }));
@@ -61,12 +61,11 @@ export function projectRetirement(params) {
       }
     }
     
-    // Apply inflation to desired income
+    // Apply inflation to desired income (Ingreso Deseado Neto)
     const currentDesiredIncome = baseDesiredIncomeMonthly * 12 * cumulativeInflation;
 
     let withdrawnFromPension = 0;
     let withdrawnFromSavings = 0;
-    let taxGeneral = 0;
     let totalRentIncome = 0;
 
     // PRE-PASO: Venta de Inmuebles y Alquileres
@@ -97,23 +96,31 @@ export function projectRetirement(params) {
       }
     }
 
-    // El alquiler se suma a la pensión para tributar en la Base General
-    let totalGeneralIncome = currentPension + totalRentIncome;
+    // 1. Pensión Pública Bruta y Cálculo de Impuestos Base de la Pensión
+    const ingresoAnualPension = currentPension;
+    const impuestosDeLaPension = calculateTaxes(ingresoAnualPension, generalTaxBrackets);
+    const pensionNetaAnual = ingresoAnualPension - impuestosDeLaPension;
 
-    const gap = currentDesiredIncome - totalGeneralIncome;
+    // Base General previa a rescates de planes de pensiones (Pensión Bruta + Alquileres Netos)
+    const baseGeneralPreRescate = ingresoAnualPension + totalRentIncome;
+    const impuestosBaseGeneralPreRescate = calculateTaxes(baseGeneralPreRescate, generalTaxBrackets);
+    const totalNetoDisponiblePreRescate = baseGeneralPreRescate - impuestosBaseGeneralPreRescate;
+
+    // Faltante (Déficit a cubrir) = Ingreso Deseado Neto - Ingresos Netos Disponibles
+    const gap = currentDesiredIncome - totalNetoDisponiblePreRescate;
     let remainingGap = gap > 0 ? gap : 0;
 
-    // PASO A: Determinar en qué tramo de la Base General se encuentra el usuario
+    // PASO A: Determinar en qué tramo de la Base General se encuentra el usuario antes de rescates
     let currentBracket = generalTaxBrackets[generalTaxBrackets.length - 1];
     for (const bracket of generalTaxBrackets) {
-      if (totalGeneralIncome < bracket.limit) {
+      if (baseGeneralPreRescate < bracket.limit) {
         currentBracket = bracket;
         break;
       }
     }
 
     // PASO B: Calcular margen hasta el siguiente tramo
-    let remainingMarginGross = currentBracket.limit - totalGeneralIncome;
+    let remainingMarginGross = Math.max(0, currentBracket.limit - baseGeneralPreRescate);
 
     // PASO C: Extraer de 'pension_plan' SOLO hasta rellenar ese margen
     // FRENO DE EMERGENCIA FISCAL: Si el tipo marginal supera el 30% (ej. 37%), es ineficiente extraer del plan de pensiones frente a la Base del Ahorro.
@@ -124,14 +131,12 @@ export function projectRetirement(params) {
           const grossNeeded = remainingGap / (1 - currentBracket.rate);
           const grossToExtract = Math.min(grossNeeded, remainingMarginGross, acc.amount);
           const netExtracted = grossToExtract * (1 - currentBracket.rate);
-          const taxesPaid = grossToExtract - netExtracted;
           
           acc.amount -= grossToExtract;
           remainingGap -= netExtracted;
           remainingMarginGross -= grossToExtract;
           
           withdrawnFromPension += grossToExtract;
-          taxGeneral += taxesPaid;
         }
       }
     }
@@ -157,16 +162,19 @@ export function projectRetirement(params) {
           const grossNeeded = remainingGap / (1 - currentBracket.rate);
           const grossToExtract = Math.min(grossNeeded, acc.amount);
           const netExtracted = grossToExtract * (1 - currentBracket.rate);
-          const taxesPaid = grossToExtract - netExtracted;
           
           acc.amount -= grossToExtract;
           remainingGap -= netExtracted;
           
           withdrawnFromPension += grossToExtract;
-          taxGeneral += taxesPaid;
         }
       }
     }
+
+    // IRPF total final del año en la Base General:
+    // El importe rescatado del Plan de Pensiones se suma al ingreso bruto de la pensión (y rentas)
+    const totalBaseGeneralBrutaFinal = baseGeneralPreRescate + withdrawnFromPension;
+    const taxGeneral = calculateTaxes(totalBaseGeneralBrutaFinal, generalTaxBrackets);
 
     // 2. Calcular beneficio global para aplicar correctamente la progresividad fiscal en Base del Ahorro
     let totalProfitSavingsBase = 0;
@@ -223,6 +231,8 @@ export function projectRetirement(params) {
       year,
       age,
       pension: currentPension,
+      pensionNetaAnual,
+      impuestosDeLaPension,
       rentIncome: totalRentIncome,
       desiredIncome: currentDesiredIncome,
       gap,
