@@ -780,6 +780,56 @@ export default function Simulator({ client, scenario, onBack }) {
                 </ResponsiveContainer>
               </div>
             </div>
+
+            {/* BLOQUE: Dictamen y Diagnóstico Técnico (Debajo de los gráficos) */}
+            {chartData?.diagnostics && chartData.diagnostics.length > 0 && (
+              <div className="bg-slate-900 print:bg-white p-6 rounded-2xl shadow-xl border border-slate-800 print:border-slate-300 print:shadow-none print:block print:w-full print:break-inside-avoid print:mb-6">
+                <h2 className="text-lg font-semibold mb-4 text-white print:text-slate-900">
+                  Dictamen y Diagnóstico Técnico
+                </h2>
+                <div className="space-y-3">
+                  {chartData.diagnostics.map((diag, index) => {
+                    const cardStyle = diag.type === 'critical'
+                      ? 'bg-red-50 border-red-200 text-red-900'
+                      : diag.type === 'warning'
+                      ? 'bg-yellow-50 border-yellow-200 text-yellow-900'
+                      : 'bg-green-50 border-green-200 text-green-900';
+
+                    return (
+                      <div 
+                        key={diag.id || index}
+                        className={`p-4 rounded-xl border ${cardStyle} shadow-sm print:break-inside-avoid`}
+                      >
+                        <div className="font-bold text-base">
+                          {diag.title}
+                        </div>
+                        <p className="text-sm mt-1 leading-relaxed">
+                          {diag.message}
+                        </p>
+                        {diag.legalRef && (
+                          <div className="mt-3 pt-2 border-t border-black/10">
+                            {diag.legalUrl ? (
+                              <a 
+                                href={diag.legalUrl} 
+                                target="_blank" 
+                                rel="noopener noreferrer" 
+                                className="text-xs underline hover:opacity-80 inline-block"
+                              >
+                                ⚖️ Fundamento Jurídico: {diag.legalRef}
+                              </a>
+                            ) : (
+                              <span className="text-xs opacity-90 inline-block">
+                                ⚖️ Fundamento: {diag.legalRef}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         </div>
         )}
@@ -1152,6 +1202,56 @@ export default function Simulator({ client, scenario, onBack }) {
             </LineChart>
           </div>
         </div>
+
+        {/* DICTAMEN Y DIAGNÓSTICO TÉCNICO (INFORME PDF - DEBAJO DE LAS GRÁFICAS) */}
+        {chartData?.diagnostics && chartData.diagnostics.length > 0 && (
+          <div className="mt-4 border border-slate-200 rounded-lg p-3 bg-white break-inside-avoid">
+            <h2 className="text-[11px] font-bold text-slate-900 uppercase tracking-wider mb-2">
+              Dictamen y Diagnóstico Técnico
+            </h2>
+            <div className="space-y-2">
+              {chartData.diagnostics.map((diag, index) => {
+                const cardStyle = diag.type === 'critical'
+                  ? 'bg-red-50 border-red-200 text-red-900'
+                  : diag.type === 'warning'
+                  ? 'bg-yellow-50 border-yellow-200 text-yellow-900'
+                  : 'bg-green-50 border-green-200 text-green-900';
+
+                return (
+                  <div 
+                    key={diag.id || index}
+                    className={`p-2.5 rounded-lg border ${cardStyle} break-inside-avoid text-xs`}
+                  >
+                    <div className="font-bold text-[11px]">
+                      {diag.title}
+                    </div>
+                    <p className="text-[10px] mt-0.5 leading-relaxed">
+                      {diag.message}
+                    </p>
+                    {diag.legalRef && (
+                      <div className="mt-1.5 pt-1 border-t border-black/10">
+                        {diag.legalUrl ? (
+                          <a 
+                            href={diag.legalUrl} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="text-[9px] font-semibold underline hover:opacity-80 inline-block text-slate-700"
+                          >
+                            ⚖️ Fundamento Jurídico: {diag.legalRef}
+                          </a>
+                        ) : (
+                          <span className="text-[9px] font-semibold inline-block text-slate-700">
+                            ⚖️ Fundamento: {diag.legalRef}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* PÁGINA 2: PLAN DE RESCATE ANUAL (SALTO DE PÁGINA LIMPIO) */}
@@ -1432,6 +1532,56 @@ export default function Simulator({ client, scenario, onBack }) {
               <div>
                 <h3 className="text-lg font-semibold text-white mb-2">8. Gestión B2B de Expedientes y Persistencia de Datos</h3>
                 <p>El sistema está diseñado para entornos de asesoría (SaaS) integrando conexión directa con bases de datos no relacionales (Firebase/Firestore). Permite archivar el "Estado Global" y la parametrización individual como un Expediente de Cliente, garantizando la recuperación, edición iterativa y seguimiento interanual del plan de jubilación sin pérdida de contexto ni reintroducción de datos.</p>
+              </div>
+
+              <div>
+                <h3 className="text-lg font-semibold text-white mb-2">9. Módulo de Diagnóstico Analítico y Fiscal Inteligente</h3>
+                <p>El motor post-procesa el array de resultados matemáticos para emitir dictámenes automatizados en tiempo real. Este módulo busca patrones de ineficiencia y traduce los datos crudos a un lenguaje comercial accionable para el cliente final, incluyendo fundamentos jurídicos vinculados directamente al Boletín Oficial del Estado (BOE) o autoridades competentes:</p>
+                <ul className="list-disc pl-5 mt-2 space-y-2">
+                  <li><strong className="text-slate-100">Regla 1 (Ineficiencia Marginal en Rescates):</strong>
+                    <ul className="list-circle pl-5 mt-1 space-y-0.5 text-xs text-slate-400">
+                      <li><strong>Condición algorítmica:</strong> El rescate del Plan de Pensiones &gt; 0 y la Base General resultante supera el tope del tramo máximo configurado.</li>
+                      <li><strong>Alerta UI:</strong> Tarjeta amarilla (Warning).</li>
+                      <li><strong>Mensaje al cliente:</strong> &ldquo;Hachazo fiscal por rescate excesivo. En el año [X], sacar tanto del Plan de Pensiones de golpe te empuja al tramo máximo de Hacienda. Acción sugerida: Reduce tu &apos;Ingreso Deseado&apos; en esta etapa para rescatar el plan poco a poco y pagar muchos menos impuestos.&rdquo;</li>
+                      <li><strong>Fundamento:</strong> Art. 63 LIRPF - Escalas de gravamen.</li>
+                    </ul>
+                  </li>
+                  <li><strong className="text-slate-100">Regla 2 (Protocolo de Supervivencia / Desastre Fiscal):</strong>
+                    <ul className="list-circle pl-5 mt-1 space-y-0.5 text-xs text-slate-400">
+                      <li><strong>Condición algorítmica:</strong> La liquidez financiera (Fondos/Cuentas) se agota (0€) provocando un rescate forzoso masivo del Plan de Pensiones para cubrir el déficit.</li>
+                      <li><strong>Alerta UI:</strong> Tarjeta roja (Critical).</li>
+                      <li><strong>Mensaje al cliente:</strong> &ldquo;Alerta de desastre fiscal por falta de liquidez. En el año [X], te quedas sin ahorros líquidos. Para mantener tu tren de vida, el sistema se ve obligado a vaciar tu Plan de Pensiones de golpe, asumiendo una penalización fiscal brutal. Acción sugerida: Ajusta tus gastos antes de llegar a este año.&rdquo;</li>
+                      <li><strong>Fundamento:</strong> Art. 17.2.a LIRPF - Tributación de Planes de Pensiones.</li>
+                    </ul>
+                  </li>
+                  <li><strong className="text-slate-100">Regla 3 (Tensión de Tesorería por Activo Ilíquido - House Rich, Cash Poor):</strong>
+                    <ul className="list-circle pl-5 mt-1 space-y-0.5 text-xs text-slate-400">
+                      <li><strong>Condición algorítmica:</strong> Capital líquido = 0€, Valor Inmobiliario &gt; 0€, Faltante a Cubrir &gt; 0€.</li>
+                      <li><strong>Alerta UI:</strong> Tarjeta roja (Critical).</li>
+                      <li><strong>Mensaje al cliente:</strong> &ldquo;Peligro: Rico en ladrillo, pobre en el banco. En el año [X], te quedas sin liquidez para el día a día a pesar de tener patrimonio inmobiliario. Acción sugerida: Programa la venta, alquiler o hipoteca inversa del inmueble antes de esta fecha.&rdquo;</li>
+                      <li><strong>Fundamento:</strong> Principio de Liquidez y Solvencia - Criterios CNMV.</li>
+                    </ul>
+                  </li>
+                  <li><strong className="text-slate-100">Regla 4 (Caída Forzosa del Nivel de Vida):</strong>
+                    <ul className="list-circle pl-5 mt-1 space-y-0.5 text-xs text-slate-400">
+                      <li><strong>Condición algorítmica:</strong> El Ingreso Neto Real mensual cae matemáticamente por debajo del Ingreso Deseado.</li>
+                      <li><strong>Alerta UI:</strong> Tarjeta roja (Critical).</li>
+                      <li><strong>Mensaje al cliente:</strong> &ldquo;Caída brusca de tu nivel de vida. A partir del año [X], tus ahorros se agotan por completo. Tu ingreso mensual caerá en picado y tendrás que sobrevivir únicamente con tu pensión pública.&rdquo;</li>
+                      <li><strong>Fundamento:</strong> Diagnóstico Matemático de Insolvencia Financiera.</li>
+                    </ul>
+                  </li>
+                  <li><strong className="text-slate-100">Escenario Óptimo (Viabilidad Sostenible):</strong>
+                    <ul className="list-circle pl-5 mt-1 space-y-0.5 text-xs text-slate-400">
+                      <li><strong>Condición algorítmica:</strong> No se activa ninguna de las alertas críticas o fiscales anteriores.</li>
+                      <li><strong>Alerta UI:</strong> Tarjeta verde (Success) certificando que la desacumulación cubre el nivel de vida sin incurrir en penalizaciones.</li>
+                    </ul>
+                  </li>
+                </ul>
+              </div>
+
+              <div>
+                <h3 className="text-lg font-semibold text-white mb-2">10. Generación de Informes y Entregables (Arquitectura de Impresión Nativa PDF)</h3>
+                <p>Para resolver las incompatibilidades históricas entre componentes SVG dinámicos (Recharts) y librerías de clonación canvas, el sistema delega la generación del informe final (PDF) en el motor de impresión nativo del navegador. Mediante CSS avanzado (print: modifiers de Tailwind), la UI interactiva se transmuta en un expediente A4 institucional: ocultando sidebars y controles, forzando paletas de color imprimibles y garantizando una resolución vectorial infinita en los gráficos de Solvencia y Nivel de Vida, evitando pixelados y rupturas de contenedores responsivos.</p>
               </div>
 
               <div className="bg-slate-800/50 p-6 rounded-xl border border-slate-700/50 mt-8">

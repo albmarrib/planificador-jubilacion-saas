@@ -154,10 +154,12 @@ export function projectRetirement(params) {
 
     // PASO SUPERVIVENCIA: Si queda déficit y hay saldo en el plan de pensiones, se fuerza el rescate
     // (Supervivencia > Optimización Fiscal)
+    let forcedPensionWithdrawal = false;
     if (remainingGap > 0) {
       for (const acc of currentSavings) {
         if (remainingGap <= 0) break;
         if (acc.type === 'pension_plan' && acc.amount > 0) {
+          forcedPensionWithdrawal = true;
           // Extraemos con el tipo marginal actual asumiendo impacto fiscal de emergencia
           const grossNeeded = remainingGap / (1 - currentBracket.rate);
           const grossToExtract = Math.min(grossNeeded, acc.amount);
@@ -250,6 +252,8 @@ export function projectRetirement(params) {
       capitalIliquido,
       withdrawnFromPension,
       withdrawnFromSavings,
+      totalBaseGeneral: totalBaseGeneralBrutaFinal,
+      forcedPensionWithdrawal,
       estimatedTaxes: taxGeneral + totalTaxesSavings,
       uncoveredDeficit: remainingGap
     });
@@ -266,6 +270,9 @@ export function projectRetirement(params) {
       }
     }
   }
+
+  const diagnostics = runDiagnosticRules(results, params);
+  results.diagnostics = diagnostics;
 
   return results;
 }
@@ -311,4 +318,102 @@ export function calculateRequiredReturn(params) {
   }
 
   return optimal !== null ? Number(optimal.toFixed(2)) : null;
+}
+
+/**
+ * Motor de Diagnóstico Analítico y Fiscal Inteligente
+ * Evalúa los resultados matemáticos y emite dictámenes con fundamentación jurídica.
+ */
+export function runDiagnosticRules(results, clientParams = {}) {
+  if (!results || results.length === 0) return [];
+
+  const diagnostics = [];
+
+  // Regla 1: Si Rescate Plan Pensiones > 0 y (Pensión + Alquileres + Rescate Plan) > 60000.
+  const rule1 = results.find(r => {
+    const rescatePlan = r.withdrawnFromPension || 0;
+    const baseGeneral = (r.pension || 0) + (r.rentIncome || 0) + rescatePlan;
+    return rescatePlan > 0 && (baseGeneral > 60000 || (r.totalBaseGeneral || 0) > 60000);
+  });
+  if (rule1) {
+    diagnostics.push({
+      id: 'concentracion-tramo-marginal',
+      type: 'warning',
+      title: 'Hachazo fiscal por rescate excesivo',
+      message: `En el año ${rule1.year}, sacar tanto del Plan de Pensiones de golpe te empuja al tramo máximo de Hacienda. Acción sugerida: Reduce tu 'Ingreso Deseado' en esta etapa para rescatar el plan poco a poco y pagar muchos menos impuestos.`,
+      year: rule1.year,
+      legalRef: 'Art. 63 LIRPF - Escalas de gravamen',
+      legalUrl: 'https://www.boe.es/buscar/act.php?id=BOE-A-2006-20764#art63'
+    });
+  }
+
+  // Regla 2: Si Rescate Fondos == 0 y Rescate Plan > 0 y Faltante > 0.
+  const rule2 = results.find(r => {
+    const rescateFondos = r.withdrawnFromSavings || 0;
+    const rescatePlan = r.withdrawnFromPension || 0;
+    const faltante = (r.gap || 0) > 0 || (r.uncoveredDeficit || 0) > 0 || !!r.forcedPensionWithdrawal;
+    return rescateFondos === 0 && rescatePlan > 0 && faltante;
+  });
+  if (rule2) {
+    diagnostics.push({
+      id: 'ruptura-margen-fiscal',
+      type: 'critical',
+      title: 'Alerta de desastre fiscal por falta de liquidez',
+      message: `En el año ${rule2.year}, te quedas sin ahorros líquidos. Para mantener tu tren de vida, el sistema se ve obligado a vaciar tu Plan de Pensiones de golpe, asumiendo una penalización fiscal brutal. Acción sugerida: Ajusta tus gastos antes de llegar a este año.`,
+      year: rule2.year,
+      legalRef: 'Art. 17.2.a LIRPF - Tributación de Planes',
+      legalUrl: 'https://www.boe.es/buscar/act.php?id=BOE-A-2006-20764#art17'
+    });
+  }
+
+  // Regla 3: Si Capital Restante == 0 y Valor Inmuebles > 0 y Faltante > 0.
+  const rule3 = results.find(r => {
+    const capitalRestante = (r.capitalLiquido || 0) <= 0.01 || (r.totalCapital || 0) <= (r.capitalIliquido || 0) + 0.01;
+    const valorInmuebles = (r.capitalIliquido || 0) > 0;
+    const faltante = (r.gap || 0) > 0 || (r.uncoveredDeficit || 0) > 0.01;
+    return capitalRestante && valorInmuebles && faltante;
+  });
+  if (rule3) {
+    diagnostics.push({
+      id: 'insolvencia-tesoreria-house-rich',
+      type: 'critical',
+      title: 'Peligro: Rico en ladrillo, pobre en el banco',
+      message: `En el año ${rule3.year}, te quedas sin liquidez para el día a día a pesar de tener patrimonio inmobiliario. Acción sugerida: Programa la venta, alquiler o hipoteca inversa del inmueble antes de esta fecha.`,
+      year: rule3.year,
+      legalRef: 'Principio de Liquidez y Solvencia - CNMV',
+      legalUrl: 'https://www.cnmv.es/portal/Inversor/Planificacion-Financiera.aspx'
+    });
+  }
+
+  // Regla 4: Si Ingreso Neto Real < Ingreso Deseado.
+  const rule4 = results.find(r => {
+    return (r.desiredMonthlyIncome || 0) > 0 && 
+      ((r.realMonthlyIncome || 0) < (r.desiredMonthlyIncome || 0) - 0.01 || (r.uncoveredDeficit || 0) > 0.01);
+  });
+  if (rule4) {
+    diagnostics.push({
+      id: 'caida-nivel-vida',
+      type: 'critical',
+      title: 'Caída brusca de tu nivel de vida',
+      message: `A partir del año ${rule4.year}, tus ahorros se agotan por completo. Tu ingreso mensual caerá en picado y tendrás que sobrevivir únicamente con tu pensión pública.`,
+      year: rule4.year,
+      legalRef: 'Diagnóstico Matemático de Insolvencia',
+      legalUrl: ''
+    });
+  }
+
+  // 3. Escenario Óptimo: Si el array de diagnósticos acaba vacío, inserta uno con type: 'success'
+  if (diagnostics.length === 0) {
+    diagnostics.push({
+      id: 'viabilidad-sostenible',
+      type: 'success',
+      title: 'Viabilidad Sostenible',
+      message: 'Estrategia eficiente sin ineficiencias fiscales graves.',
+      year: null,
+      legalRef: '',
+      legalUrl: ''
+    });
+  }
+
+  return diagnostics;
 }
